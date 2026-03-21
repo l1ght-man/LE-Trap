@@ -21,15 +21,16 @@ TARGET_PORT_FTP = 21
 TARGET_PORT_TELNET = 23
 TARGET_PORT_HTTP = 80
 
-# Simulated attacking IPs (for X-Forwarded-For header)
+# Simulated attacking IPs (for X-Forwarded-For header) - PUBLIC IPs ONLY
 ATTACKER_IPS = [
-    "192.168.100.50",    # Local network
-    "203.0.113.45",      # ISP range
-    "198.51.100.200",    # Another ISP
-    "45.142.120.50",     # Known botnet
-    "195.154.173.208",   # European attacker
-    "39.96.54.123",      # Asian attacker
-    "185.220.101.1",     # Tor exit node
+    "203.0.113.45",      # ISP range (Documentation)
+    "198.51.100.200",    # Another ISP (Documentation)
+    "45.142.120.50",     # Known botnet (Bulgaria)
+    "195.154.173.208",   # European attacker (France)
+    "39.96.54.123",      # Asian attacker (China)
+    "185.220.101.1",     # Tor exit node (Germany)
+    "91.198.174.192",    # Wikimedia (US East)
+    "172.217.16.142",    # Google Services (US)
 ]
 
 # Credentials to try
@@ -211,28 +212,31 @@ class AttackSimulator:
         self.log(f"STARTING ATTACK SEQUENCE FROM: {attacker_ip}")
         self.log(f"{'='*60}")
         
-        # Simulate different attacks
+        # HTTP reconnaissance (slow, human-like 3-5 sec)
         self.simulate_http_attack(attacker_ip)
-        time.sleep(random.uniform(0.5, 2))
+        time.sleep(random.uniform(3, 5))
         
+        # FTP probe (human-like 4-7 sec)
         self.simulate_ftp_attack(attacker_ip)
-        time.sleep(random.uniform(0.5, 2))
+        time.sleep(random.uniform(4, 7))
         
+        # Telnet attempt (human-like 5-8 sec)
         self.simulate_telnet_attack(attacker_ip)
-        time.sleep(random.uniform(0.5, 2))
+        time.sleep(random.uniform(5, 8))
         
+        # SSH brute force (human-like 6-10 sec)
         self.simulate_ssh_attack(attacker_ip)
-        time.sleep(random.uniform(0.5, 2))
+        time.sleep(random.uniform(6, 10))
         
         self.stats['total'] += 4
     
     def run_distributed_attack(self, num_attackers: int = 5):
         """Simulate attacks from multiple IPs"""
         print("\n" + "="*70)
-        print("HONEYPOT DISTRIBUTED ATTACK SIMULATION")
+        print("HONEYPOT DISTRIBUTED ATTACK SIMULATION - FRESH DATA GENERATION")
         print("="*70)
         print(f"Target: {self.target_host}")
-        print(f"Simulating {num_attackers} attackers")
+        print(f"Simulating {num_attackers} attackers (human + bot patterns)")
         print("="*70 + "\n")
         
         attackers = random.sample(ATTACKER_IPS, min(num_attackers, len(ATTACKER_IPS)))
@@ -240,10 +244,19 @@ class AttackSimulator:
         try:
             for i, attacker_ip in enumerate(attackers, 1):
                 print(f"\n[{i}/{num_attackers}] Attacker: {attacker_ip}")
-                self.run_full_attack_sequence(attacker_ip)
+                
+                # Mix: some human-like (slow), some bot-like (fast)
+                if random.random() > 0.3:  # 70% human-like attacks
+                    self.run_full_attack_sequence(attacker_ip)
+                else:  # 30% rapid bot-like attacks (triggers ML bot detection)
+                    print(f"      [BOT PATTERN DETECTED] Rapid-fire attacks from {attacker_ip}")
+                    for _ in range(5):
+                        self.simulate_http_attack(attacker_ip)
+                        time.sleep(random.uniform(0.8, 1.2))  # Bot-like 1-sec intervals
+                    self.stats['total'] += 5
                 
                 if i < num_attackers:
-                    delay = random.uniform(3, 8)
+                    delay = random.uniform(8, 15)  # Realistic delay between attackers (8-15 sec)
                     print(f"\nWaiting {delay:.1f}s before next attack...\n")
                     time.sleep(delay)
         

@@ -27,6 +27,9 @@ Honeypot_logs/
 logs/
 *.jsonl
 *.csv
+data/*.json
+data/ip_cache.json
+data/threat_cache.json
 
 # Reports & Exports
 attack_report.html
