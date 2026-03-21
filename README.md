@@ -331,6 +331,34 @@ We welcome contributions:
 
 ---
 
+## Development & Transparency
+
+### AI Assistance Disclosure
+
+This project was developed with AI assistance (GitHub Copilot) for specific implementation tasks.
+
+**What was built independently:**
+- System architecture and design
+- Technical decisions (threat intelligence provider selection, caching strategy, ML approach)
+- Backend logic and API implementation
+- Machine learning concepts and model selection
+- Data enrichment pipeline design
+- Integration strategy for multiple services
+
+**What AI assisted with:**
+- Frontend code implementation (JavaScript, HTML, CSS)
+- UI component scaffolding
+- Dashboard animations and responsive design
+- PDF template formatting
+- Test boilerplate and fixtures
+
+**Why this transparency matters:**
+Every architectural decision and security consideration in this codebase is deliberate and understood. The project is production-ready because the underlying design is sound and tested, not because of implementation details. The AI assistance accelerated development without compromising code quality or security posture.
+
+This is the reality of software development in 2026: using available tools efficiently while maintaining ownership of decisions and understanding of the system.
+
+---
+
 ## License
 
 MIT License - See [LICENSE](LICENSE) file for details.
