@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>HoneyPot Security Report</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 11pt;
+            color: #333;
+        }
+        
+        h1 {
+            font-size: 22pt;
+            color: #8b5cf6;
+            text-align: center;
+            margin: 0 0 5px 0;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-bottom: 3px solid #8b5cf6;
+        }
+        
+        h2 {
+            font-size: 14pt;
+            color: #6366f1;
+            margin: 20px 0 10px 0;
+            padding: 5px 0;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .subtitle {
+            text-align: center;
+            font-size: 10pt;
+            color: #666;
+            margin-bottom: 25px;
+        }
+        
+        .info-box {
+            background-color: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 10px;
+            margin: 15px 0;
+            font-size: 9pt;
+        }
+        
+        .summary-item {
+            padding: 10px;
+            margin: 8px 0;
+            background-color: #f3f4f6;
+            border-left: 4px solid #8b5cf6;
+        }
+        
+        .summary-item strong {
+            color: #374151;
+            font-size: 9pt;
+        }
+        
+        .summary-item .big {
+            font-size: 18pt;
+            font-weight: bold;
+            color: #8b5cf6;
+            display: block;
+            margin-top: 5px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0 25px 0;
+            font-size: 10pt;
+        }
+        
+        thead {
+            background-color: #6366f1;
+            color: white;
+        }
+        
+        th {
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 10pt;
+        }
+        
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #e5e7eb;
+            vertical-align: middle;
+        }
+        
+        tbody tr {
+            background-color: white;
+        }
+        
+        tbody tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        
+        td strong {
+            font-size: 11pt;
+            color: #1f2937;
+        }
+        
+        .badge {
+            padding: 4px 10px;
+            border: 2px solid;
+            font-size: 9pt;
+            font-weight: bold;
+        }
+        
+        .badge-critical {
+            border-color: #991b1b;
+            color: #991b1b;
+        }
+        
+        .badge-high {
+            border-color: #9a3412;
+            color: #9a3412;
+        }
+        
+        .badge-medium {
+            border-color: #92400e;
+            color: #92400e;
+        }
+        
+        .badge-low {
+            border-color: #065f46;
+            color: #065f46;
+        }
+        
+        .code {
+            font-family: Courier, monospace;
+            padding: 3px 6px;
+            font-size: 9pt;
+            color: #1f2937;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 2px solid #e5e7eb;
+            text-align: center;
+            font-size: 8pt;
+            color: #6b7280;
+        }
+        
+        .rank {
+            padding: 4px 10px;
+            font-weight: bold;
+            font-size: 9pt;
+            color: #6366f1;
+            border: 2px solid #6366f1;
+        }
+    </style>
+</head>
+<body>
+    <h1>HONEYPOT SECURITY REPORT</h1>
+    <div class="subtitle">Comprehensive Attack Analysis</div>
+    
+    <div class="info-box">
+        <strong>Report Generated:</strong> {{ report_date }}<br/>
+        <strong>Time Period:</strong> {{ time_range }}
+        {% if filters_applied %}
+        <br/><strong>Filters:</strong> IP: {{ ip_filter or 'All' }} | Port: {{ port_filter or 'All' }} | Event: {{ event_filter or 'All' }}
+        {% endif %}
+    </div>
+    
+    <h2>EXECUTIVE SUMMARY</h2>
+    
+    <div class="summary-item">
+        <strong>Total Attack Attempts</strong>
+        <span class="big">{{ "{:,}".format(stats.total_attacks) }}</span>
+    </div>
+    
+    <div class="summary-item">
+        <strong>Unique Attacker IPs</strong>
+        <span class="big">{{ stats.top_ips | length }}</span>
+    </div>
+    
+    <div class="summary-item">
+        <strong>Credentials Captured</strong>
+        <span class="big">{{ "{:,}".format(stats.credentials_captured) }}</span>
+    </div>
+    
+    <div class="summary-item">
+        <strong>Targeted Ports</strong>
+        <span class="big">{{ stats.ports | length }}</span>
+    </div>
+    
+    <h2>TOP ATTACKING IP ADDRESSES</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>IP Address</th>
+                <th>Attack Count</th>
+                <th>Threat Level</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ip in stats.top_ips[:10] %}
+            <tr>
+                <td><span class="rank">#{{ loop.index }}</span></td>
+                <td><span class="code">{{ ip.ip }}</span></td>
+                <td><strong>{{ "{:,}".format(ip.count) }}</strong></td>
+                <td>
+                    {% if ip.count > 100 %}
+                        <span class="badge badge-critical">CRITICAL</span>
+                    {% elif ip.count > 50 %}
+                        <span class="badge badge-high">HIGH</span>
+                    {% elif ip.count > 20 %}
+                        <span class="badge badge-medium">MEDIUM</span>
+                    {% else %}
+                        <span class="badge badge-low">LOW</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <h2>PORT ATTACK DISTRIBUTION</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Port</th>
+                <th>Service</th>
+                <th>Attack Count</th>
+                <th>Percentage</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for port, count in sorted_ports[:8] %}
+            <tr>
+                <td><span class="code">{{ port }}</span></td>
+                <td>{{ port_services.get(port|int, 'Unknown') }}</td>
+                <td><strong>{{ "{:,}".format(count) }}</strong></td>
+                <td>{{ "%.1f"|format((count / total_port_attacks * 100) if total_port_attacks > 0 else 0) }}%</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    {% if logs %}
+    <h2>RECENT ATTACK SAMPLES</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Source IP</th>
+                <th>Event Type</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs[:8] %}
+            <tr>
+                <td><span class="code">{{ log.timestamp_short }}</span></td>
+                <td><span class="code">{{ log.source_ip[:18] }}</span></td>
+                <td>{{ log.event_type }}</td>
+                <td><span class="code">{{ log.details[:30] }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+    
+    <div class="footer">
+        <p><strong>HoneyPot Monitoring System</strong></p>
+        <p>Confidential Security Report</p>
+    </div>
+</body>
+</html>

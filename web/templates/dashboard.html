@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐻 HoneyPot Dashboard - Real-Time Monitoring</title>
+    
+    <!-- Leaflet.js for maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- Socket.IO for real-time updates -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1>🐻 HoneyPot Dashboard</h1>
+            <div class="status">
+                <span class="status-indicator" id="connectionStatus">
+                    <span class="dot"></span> Connecting...
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Stats Cards -->
+    <section class="stats-section">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-value" id="totalAttacks">0</div>
+                    <div class="stat-label">Total Attacks</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🔐</div>
+                    <div class="stat-value" id="sshAttacks">0</div>
+                    <div class="stat-label">SSH (22)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📡</div>
+                    <div class="stat-value" id="telnetAttacks">0</div>
+                    <div class="stat-label">Telnet (23)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🌐</div>
+                    <div class="stat-value" id="httpAttacks">0</div>
+                    <div class="stat-label">HTTP (80)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📂</div>
+                    <div class="stat-value" id="ftpAttacks">0</div>
+                    <div class="stat-label">FTP (21)</div>
+                </div>
+                <div class="stat-card highlight">
+                    <div class="stat-icon">🚨</div>
+                    <div class="stat-value" id="credsCaptured">0</div>
+                    <div class="stat-label">Credentials Captured</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Filter Panel -->
+    <section class="filter-section">
+        <div class="container">
+            <div class="filter-panel">
+                <div class="filter-group">
+                    <label>🔍 Search IP</label>
+                    <input type="text" id="filterIP" placeholder="e.g. 192.168.1.1" class="filter-input">
+                </div>
+                <div class="filter-group">
+                    <label>📡 Port</label>
+                    <select id="filterPort" class="filter-select">
+                        <option value="">All Ports</option>
+                        <option value="22">SSH (22)</option>
+                        <option value="23">Telnet (23)</option>
+                        <option value="80">HTTP (80)</option>
+                        <option value="21">FTP (21)</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>🎯 Event Type</label>
+                    <select id="filterEvent" class="filter-select">
+                        <option value="">All Events</option>
+                        <option value="credential">Credentials</option>
+                        <option value="command">Commands</option>
+                        <option value="connection">Connections</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>⏰ Time Range</label>
+                    <select id="filterTime" class="filter-select">
+                        <option value="all">All Time</option>
+                        <option value="12h">Last 12 Hours</option>
+                        <option value="24h" selected>Last 24 Hours</option>
+                        <option value="7d">Last 7 Days</option>
+                        <option value="30d">Last 30 Days</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <button id="clearFilters" class="btn-small">Clear Filters</button>
+                </div>
+                <div class="filter-group">
+                    <label>📥 Export</label>
+                    <div class="export-buttons">
+                        <button id="exportCSV" class="btn-export">CSV</button>
+                        <button id="exportPDF" class="btn-export">PDF</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <section class="main-content">
+        <div class="container">
+            <div class="content-grid">
+                <!-- Attack Map -->
+                <div class="panel map-panel">
+                    <div class="panel-header">
+                        <h2>🗺️ Attack Origin Map</h2>
+                        <span class="panel-badge" id="mapCount">0 locations</span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="attackMap"></div>
+                        <div class="map-placeholder" id="mapPlaceholder">
+                            <p>📍 GeoIP data will appear here</p>
+                            <p class="small">Configure GeoIP in Phase 3</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Feed -->
+                <div class="panel feed-panel">
+                    <div class="panel-header">
+                        <h2>📝 Live Attack Feed</h2>
+                        <button class="btn-small" onclick="clearFeed()">Clear</button>
+                    </div>
+                    <div class="panel-body">
+                        <div id="liveFeed" class="live-feed">
+                            <div class="feed-item">
+                                <span class="feed-time">--:--:--</span>
+                                <span class="feed-text">Waiting for attacks...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="content-grid charts-row">
+                <!-- Port Distribution -->
+                <div class="panel chart-small">
+                    <div class="panel-header">
+                        <h2>📊 Port Distribution</h2>
+                    </div>
+                    <div class="panel-body chart-container-small">
+                        <canvas id="portChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Timeline Chart -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>📈 Attack Timeline</h2>
+                        <span class="panel-badge" id="timelineLabel">Last 24h</span>
+                    </div>
+                    <div class="panel-body">
+                        <canvas id="timelineChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top IPs Row -->
+            <div class="content-grid charts-row">
+                <!-- Top IPs -->
+                <!-- Top IPs -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>🥇 Top Attacking IPs</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div id="topIPs" class="ip-list">
+                            <div class="ip-item">
+                                <span class="ip-address">No data yet</span>
+                                <span class="ip-count">0 hits</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>🐻 HoneyPot Dashboard | Educational Security Research Tool</p>
+            <p class="small">Last updated: <span id="lastUpdate">--:--:--</span></p>
+        </div>
+    </footer>
+
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>

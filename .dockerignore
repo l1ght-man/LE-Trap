@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+
+# Logs (will be mounted as volume)
+Honeypot_logs/*.jsonl
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+DASHBOARD_PLAN.md
+future_features.txt
+
+# Reports
+attack_report.html
+
+# IDE
+.vscode/
+.idea/
+*.swp

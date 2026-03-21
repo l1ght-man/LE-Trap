@@ -4,8 +4,8 @@ from pathlib import Path
 from collections import Counter
 import datetime
 
-LOG_DIR = Path ("honeypot_logs")
-HTML_REPORT = "attack_report.html"
+LOG_DIR = Path("../logs")
+HTML_REPORT = "../reports/attack_report.html"
 
 def load_logs ():
     all_logs = []
@@ -19,13 +19,13 @@ def load_logs ():
     print(f"loaded {len(all_logs)} log entries")
     return all_logs
 def analyse_logs (logs):
-    ips = Counter(entry['ip'] for entry in logs)
+    ips = Counter(entry['source_ip'] for entry in logs)
     ports = Counter(entry['port'] for entry in logs)
     paths = Counter()
     agents = Counter()
     creds = Counter()
     for entry in logs :
-        data = entry['data'].lower()
+        data = entry['details'].lower()
 
         if 'http get' in data or 'http post' in data :
             if "'" in data:

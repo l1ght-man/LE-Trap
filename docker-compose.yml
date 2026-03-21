@@ -1,0 +1,81 @@
+version: '3.8'
+
+# ============================================================================
+# HoneyPot Docker Compose Configuration
+# ============================================================================
+# 
+# FIRST TIME SETUP:
+# -----------------
+# 1. Build the attacker interaction container (Ubuntu shell for SSH/Telnet):
+#    docker build -f Dockerfile.honeypot -t honeypot/ubuntu-locked:latest .
+#
+# 2. Start all services:
+#    docker-compose up --build
+#
+# 3. Access dashboard:
+#    http://localhost:5000
+#
+# USAGE:
+# ------
+# Start:     docker-compose up -d
+# Stop:      docker-compose down
+# Logs:      docker-compose logs -f
+# Rebuild:   docker-compose up --build
+#
+# ============================================================================
+
+services:
+  # ========================================
+  # Honeypot Service
+  # ========================================
+  # Listens on ports 21, 22, 23, 80
+  # Captures attack attempts and logs them
+  # Spawns Docker containers for SSH/Telnet sessions
+  honeypot:
+    build: .
+    container_name: honeypot-main
+    command: python src/honeypot.py
+    ports:
+      - "21:21"   # FTP
+      - "22:22"   # SSH  
+      - "23:23"   # Telnet
+      - "80:80"   # HTTP
+    volumes:
+      # Share logs with dashboard
+      - ./logs:/app/logs
+      # Mount Docker socket so honeypot can spawn attacker containers
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - honeypot-net
+    restart: unless-stopped
+    depends_on:
+      - dashboard
+
+  # ========================================
+  # Dashboard Service  
+  # ========================================
+  # Real-time web dashboard for monitoring
+  # Displays attack map, statistics, and live feed
+  dashboard:
+    build: .
+    container_name: honeypot-dashboard
+    command: python src/dashboard.py
+    ports:
+      - "127.0.0.1:5000:5000"   # Dashboard web interface
+    volumes:
+      # Share logs with honeypot (read-only)
+      - ./logs:/app/logs:ro
+      # Mount web assets for live development
+      - ./web:/app/web
+    networks:
+      - honeypot-net
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=development
+
+networks:
+  honeypot-net:
+    driver: bridge
+
+volumes:
+  honeypot-logs:
