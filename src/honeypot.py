@@ -11,7 +11,7 @@ import urllib.parse
 import paramiko
 
 # Configuration
-LOG_DIR = Path("logs")
+LOG_DIR = Path(__file__).parent.parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
 class Honeypot:
@@ -290,7 +290,7 @@ class Honeypot:
                             self.log_activity(ip, 21, "FTP_LOGIN", f"password={pwd_preview}")
                             sock.send(b"230 Login successful.\r\n")
                             self.log_activity(ip, 21, "FTP_LOGIN", f"user={arg}")
-                            print(f"\n🚨 FTP CREDENTIAL [{datetime.datetime.now().strftime('%H:%M:%S')}]")
+                            print(f"\n[FTP] {datetime.datetime.now().strftime('%H:%M:%S')} | {ip}")
                             print(f"   IP: {ip} | Password: '{pwd_preview}'\n", flush=True) 
                         elif cmd == "LIST":
                             sock.send(b"150 Opening ASCII mode data connection.\r\n")
@@ -359,19 +359,16 @@ class Honeypot:
         }
         if credentials:
             activity["credentials"] = credentials
-            print(f"\n🚨 CREDENTIAL CAPTURED [{timestamp.split('T')[1][:8]}]")
-            print(f"   IP: {ip} | Service: {activity['service']}")
-            print(f"   User: {credentials['username']} | Pass: {credentials['password']}\n", flush=True)
+            print(f"\n[CRED] {timestamp.split('T')[1][:8]} | {ip} | {activity['service'].upper()}")
+            print(f"       User: {credentials['username']} | Pass: {credentials['password']}\n", flush=True)
         log_file = LOG_DIR / f"honeypot_{datetime.date.today()}.jsonl"
         with open(log_file, "a", encoding='utf-8') as f :
             f.write(json.dumps(activity, ensure_ascii=False)+ "\n")
     def alert_high_risk(self, ip, port, event_type, details=""):
-        """Simple console alert for high-risk events (no Slack/Discord needed yet)"""
-        alert_msg = f"\n🚨 HIGH RISK EVENT [{datetime.datetime.now().strftime('%H:%M:%S')}]\n"
-        alert_msg += f"   IP: {ip}\n"
-        alert_msg += f"   Port: {port}\n"
-        alert_msg += f"   Event: {event_type}\n"
-        alert_msg += f"   Details: {details[:80]}\n"
+        """Simple console alert for high-risk events"""
+        alert_msg = f"\n[ALERT] {datetime.datetime.now().strftime('%H:%M:%S')} | {ip}:{port}\n"
+        alert_msg += f"        Event: {event_type}\n"
+        alert_msg += f"        Details: {details[:80]}\n"
         print(alert_msg, flush=True)
 
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐻 HoneyPot Dashboard - Real-Time Monitoring</title>
+    <title>LE-TRAP MONITORING - Real-Time Threat Intelligence</title>
     
     <!-- Leaflet.js for maps -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -22,10 +22,10 @@
     <!-- Header -->
     <header class="header">
         <div class="container">
-            <h1>🐻 HoneyPot Dashboard</h1>
+            <h1>[ LE-TRAP MONITORING ]</h1>
             <div class="status">
                 <span class="status-indicator" id="connectionStatus">
-                    <span class="dot"></span> Connecting...
+                    <span class="dot"></span> CONNECTING...
                 </span>
             </div>
         </div>
@@ -36,34 +36,20 @@
         <div class="container">
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-icon">🎯</div>
                     <div class="stat-value" id="totalAttacks">0</div>
-                    <div class="stat-label">Total Attacks</div>
+                    <div class="stat-label">// TOTAL ATTACKS</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon">🔐</div>
-                    <div class="stat-value" id="sshAttacks">0</div>
-                    <div class="stat-label">SSH (22)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">📡</div>
-                    <div class="stat-value" id="telnetAttacks">0</div>
-                    <div class="stat-label">Telnet (23)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">🌐</div>
-                    <div class="stat-value" id="httpAttacks">0</div>
-                    <div class="stat-label">HTTP (80)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">📂</div>
-                    <div class="stat-value" id="ftpAttacks">0</div>
-                    <div class="stat-label">FTP (21)</div>
-                </div>
-                <div class="stat-card highlight">
-                    <div class="stat-icon">🚨</div>
                     <div class="stat-value" id="credsCaptured">0</div>
-                    <div class="stat-label">Credentials Captured</div>
+                    <div class="stat-label">// CREDENTIALS</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgThreat">--</div>
+                    <div class="stat-label">// AVG THREAT</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="active24h">0</div>
+                    <div class="stat-label">// ACTIVE 24H</div>
                 </div>
             </div>
         </div>
@@ -74,13 +60,13 @@
         <div class="container">
             <div class="filter-panel">
                 <div class="filter-group">
-                    <label>🔍 Search IP</label>
-                    <input type="text" id="filterIP" placeholder="e.g. 192.168.1.1" class="filter-input">
+                    <label>IP ADDRESS</label>
+                    <input type="text" id="filterIP" class="filter-input" placeholder="e.g., 39.96.54.123">
                 </div>
                 <div class="filter-group">
-                    <label>📡 Port</label>
+                    <label>PORT</label>
                     <select id="filterPort" class="filter-select">
-                        <option value="">All Ports</option>
+                        <option value="">All</option>
                         <option value="22">SSH (22)</option>
                         <option value="23">Telnet (23)</option>
                         <option value="80">HTTP (80)</option>
@@ -88,30 +74,28 @@
                     </select>
                 </div>
                 <div class="filter-group">
-                    <label>🎯 Event Type</label>
+                    <label>EVENT TYPE</label>
                     <select id="filterEvent" class="filter-select">
-                        <option value="">All Events</option>
+                        <option value="">All</option>
                         <option value="credential">Credentials</option>
                         <option value="command">Commands</option>
                         <option value="connection">Connections</option>
                     </select>
                 </div>
                 <div class="filter-group">
-                    <label>⏰ Time Range</label>
+                    <label>TIME RANGE</label>
                     <select id="filterTime" class="filter-select">
-                        <option value="all">All Time</option>
-                        <option value="12h">Last 12 Hours</option>
-                        <option value="24h" selected>Last 24 Hours</option>
+                        <option value="all" selected>All Time</option>
+                        <option value="12h">Last 12h</option>
+                        <option value="24h">Last 24h</option>
                         <option value="7d">Last 7 Days</option>
                         <option value="30d">Last 30 Days</option>
                     </select>
                 </div>
                 <div class="filter-group">
-                    <button id="clearFilters" class="btn-small">Clear Filters</button>
-                </div>
-                <div class="filter-group">
-                    <label>📥 Export</label>
+                    <label>ACTIONS</label>
                     <div class="export-buttons">
+                        <button id="clearFilters" class="btn-export">Clear</button>
                         <button id="exportCSV" class="btn-export">CSV</button>
                         <button id="exportPDF" class="btn-export">PDF</button>
                     </div>
@@ -127,14 +111,13 @@
                 <!-- Attack Map -->
                 <div class="panel map-panel">
                     <div class="panel-header">
-                        <h2>🗺️ Attack Origin Map</h2>
-                        <span class="panel-badge" id="mapCount">0 locations</span>
+                        <h2>ATTACK ORIGIN MAP</h2>
+                        <span class="panel-badge" id="mapCount">0 LOCATIONS</span>
                     </div>
                     <div class="panel-body">
-                        <div id="attackMap"></div>
+                        <div id="attackMap" style="display: none;"></div>
                         <div class="map-placeholder" id="mapPlaceholder">
-                            <p>📍 GeoIP data will appear here</p>
-                            <p class="small">Configure GeoIP in Phase 3</p>
+                            <p>🔄 Loading map data...</p>
                         </div>
                     </div>
                 </div>
@@ -142,14 +125,16 @@
                 <!-- Live Feed -->
                 <div class="panel feed-panel">
                     <div class="panel-header">
-                        <h2>📝 Live Attack Feed</h2>
-                        <button class="btn-small" onclick="clearFeed()">Clear</button>
+                        <h2>RECENT ACTIVITY</h2>
+                        <span class="live-indicator">
+                            <span class="live-dot"></span>
+                            <span id="liveStatus">LIVE</span>
+                        </span>
                     </div>
                     <div class="panel-body">
                         <div id="liveFeed" class="live-feed">
-                            <div class="feed-item">
-                                <span class="feed-time">--:--:--</span>
-                                <span class="feed-text">Waiting for attacks...</span>
+                            <div class="feed-placeholder">
+                                <div class="placeholder-text">Waiting for attacks...</div>
                             </div>
                         </div>
                     </div>
@@ -161,7 +146,7 @@
                 <!-- Port Distribution -->
                 <div class="panel chart-small">
                     <div class="panel-header">
-                        <h2>📊 Port Distribution</h2>
+                        <h2>PORT DISTRIBUTION</h2>
                     </div>
                     <div class="panel-body chart-container-small">
                         <canvas id="portChart"></canvas>
@@ -171,8 +156,8 @@
                 <!-- Timeline Chart -->
                 <div class="panel">
                     <div class="panel-header">
-                        <h2>📈 Attack Timeline</h2>
-                        <span class="panel-badge" id="timelineLabel">Last 24h</span>
+                        <h2>ATTACK TIMELINE</h2>
+                        <span class="panel-badge" id="timelineLabel">24H</span>
                     </div>
                     <div class="panel-body">
                         <canvas id="timelineChart"></canvas>
@@ -180,19 +165,122 @@
                 </div>
             </div>
 
-            <!-- Top IPs Row -->
+            <!-- Top IPs & Threat Intelligence Row -->
             <div class="content-grid charts-row">
-                <!-- Top IPs -->
                 <!-- Top IPs -->
                 <div class="panel">
                     <div class="panel-header">
-                        <h2>🥇 Top Attacking IPs</h2>
+                        <h2>TOP ATTACKING IPs</h2>
                     </div>
                     <div class="panel-body">
                         <div id="topIPs" class="ip-list">
                             <div class="ip-item">
                                 <span class="ip-address">No data yet</span>
-                                <span class="ip-count">0 hits</span>
+                                <span class="ip-count">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Threat Intelligence -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>THREAT INTELLIGENCE</h2>
+                        <span class="panel-badge" id="threatBadge">AbuseIPDB</span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="threatIntel" class="threat-list">
+                            <div class="threat-item">
+                                <span class="threat-placeholder">Enriching logs...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ML Metrics Row -->
+            <div class="content-grid charts-row">
+                <!-- ML Model Performance -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>ML MODEL PERFORMANCE</h2>
+                        <span class="panel-badge" id="mlBadge">Enhanced</span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="mlMetrics" class="ml-metrics-container">
+                            <div class="metric-row">
+                                <span class="metric-label">Baseline Accuracy:</span>
+                                <span class="metric-value" id="baselineAccuracy">--</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Enhanced Accuracy:</span>
+                                <span class="metric-value highlight" id="enhancedAccuracy">--</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Improvement:</span>
+                                <span class="metric-value" id="mlImprovement">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Attack Classification -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>ATTACK CLASSIFICATION</h2>
+                        <span class="panel-badge" id="classificationBadge">Bot vs Human</span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="classification" class="classification-container">
+                            <div class="class-item">
+                                <span class="class-label">Bot Attacks:</span>
+                                <span class="class-count" id="botCount">0</span>
+                                <span class="class-percent" id="botPercent">0%</span>
+                            </div>
+                            <div class="class-item">
+                                <span class="class-label">Human Attacks:</span>
+                                <span class="class-count" id="humanCount">0</span>
+                                <span class="class-percent" id="humanPercent">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feature Importance -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>FEATURE IMPORTANCE</h2>
+                        <span class="panel-badge">Top 4</span>
+                    </div>
+                    <div class="panel-body">
+                        <div id="featureImportance" class="feature-importance-container">
+                            <div class="feature-bar">
+                                <div class="feature-name">Timing Patterns</div>
+                                <div class="bar-container">
+                                    <div class="bar-fill" style="width: 86.4%"></div>
+                                    <span class="bar-label">86.4%</span>
+                                </div>
+                            </div>
+                            <div class="feature-bar">
+                                <div class="feature-name">Abuse Reports</div>
+                                <div class="bar-container">
+                                    <div class="bar-fill" style="width: 9.2%"></div>
+                                    <span class="bar-label">9.2%</span>
+                                </div>
+                            </div>
+                            <div class="feature-bar">
+                                <div class="feature-name">Abuse Score</div>
+                                <div class="bar-container">
+                                    <div class="bar-fill" style="width: 2.3%"></div>
+                                    <span class="bar-label">2.3%</span>
+                                </div>
+                            </div>
+                            <div class="feature-bar">
+                                <div class="feature-name">Tor Detection</div>
+                                <div class="bar-container">
+                                    <div class="bar-fill" style="width: 2.1%"></div>
+                                    <span class="bar-label">2.1%</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -204,8 +292,8 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p>🐻 HoneyPot Dashboard | Educational Security Research Tool</p>
-            <p class="small">Last updated: <span id="lastUpdate">--:--:--</span></p>
+            <p>HONEYPOT DASHBOARD | EDUCATIONAL SECURITY RESEARCH TOOL</p>
+            <p class="small">LAST UPDATE: <span id="lastUpdate">--:--:--</span></p>
         </div>
     </footer>
 

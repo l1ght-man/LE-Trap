@@ -65,6 +65,8 @@ services:
     volumes:
       # Share logs with honeypot (read-only)
       - ./logs:/app/logs:ro
+      # Share threat intelligence data
+      - ./data:/app/data
       # Mount web assets for live development
       - ./web:/app/web
     networks:
@@ -72,6 +74,30 @@ services:
     restart: unless-stopped
     environment:
       - FLASK_ENV=development
+
+  # ========================================
+  # ML Enrichment Service
+  # ========================================
+  # Enriches honeypot logs with threat intelligence
+  # Runs periodically to process new attacks
+  ml-enrichment:
+    build: .
+    container_name: honeypot-ml
+    command: python src/enrichment_daemon.py
+    volumes:
+      # Read cleaned/raw logs
+      - ./logs:/app/logs:ro
+      # Read/write enriched data
+      - ./data:/app/data
+      # ML models and data
+      - ./ml:/app/ml
+    networks:
+      - honeypot-net
+    restart: unless-stopped
+    environment:
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY}
+    depends_on:
+      - dashboard
 
 networks:
   honeypot-net:

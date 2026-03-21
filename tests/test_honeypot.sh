@@ -49,7 +49,7 @@ test_http() {
         curl -s -H "X-Forwarded-For: ${fake_ip}" "http://${TARGET}:${PORT_HTTP}/" > /dev/null && \
             echo -e "${GREEN}✓${NC} GET request sent from ${fake_ip}"
         
-        sleep 1
+        sleep 0.2
     done
     
     # Fake credential submissions from different IPs
@@ -87,31 +87,31 @@ test_telnet() {
     # Failed login attempt
     echo -e "${BLUE}→${NC} Attempting failed login (hacker/password123)..."
     (
-        sleep 1
+        sleep 0.3
         echo "hacker"
-        sleep 1
+        sleep 0.3
         echo "password123"
-        sleep 2
+        sleep 0.5
     ) | timeout 10 telnet ${TARGET} ${PORT_TELNET} 2>&1 | grep -i "login\|incorrect\|welcome" || true
     
-    sleep 2
+    sleep 0.5
     
     # Successful login with valid credentials
     echo -e "${BLUE}→${NC} Attempting successful login (admin/admin)..."
     (
-        sleep 1
+        sleep 0.3
         echo "admin"
-        sleep 1
+        sleep 0.3
         echo "admin"
-        sleep 2
+        sleep 0.5
         echo "whoami"
-        sleep 1
+        sleep 0.2
         echo "ls -la"
-        sleep 1
+        sleep 0.2
         echo "cat /etc/passwd"
-        sleep 1
+        sleep 0.2
         echo "exit"
-        sleep 1
+        sleep 0.2
     ) | timeout 15 telnet ${TARGET} ${PORT_TELNET} 2>&1 | grep -i "login\|welcome\|root\|bash" || true
     
     echo -e "${GREEN}✓${NC} Telnet attacks completed"
@@ -141,7 +141,7 @@ test_ssh() {
             ${user}@${TARGET} -p ${PORT_SSH} \
             "whoami; ls -la; exit" 2>&1 | head -n 3 || true
         
-        sleep 2
+        sleep 0.5
     done
     
     echo -e "${GREEN}✓${NC} SSH brute force simulation completed"
@@ -163,8 +163,8 @@ test_port_scan() {
 # Main Execution
 # ============================================================================
 
-echo -e "\n${BLUE}Starting attack simulation in 3 seconds...${NC}"
-sleep 3
+echo -e "\n${BLUE}Starting attack simulation in 1 second...${NC}"
+sleep 1
 
 # Check if required tools are installed
 command -v curl >/dev/null 2>&1 || { echo -e "${RED}✗ curl not installed${NC}"; exit 1; }

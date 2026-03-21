@@ -12,7 +12,7 @@ THREAT_CACHE_FILE =  DATA_DIR / "threat_cache.json"
 
 
 class ThreatIntelligence:
-    def __init__(self, cache_file , api_key):
+    def __init__(self, api_key):
         
         self.api_key = api_key
         self.cache_file = THREAT_CACHE_FILE
@@ -147,7 +147,7 @@ class ThreatIntelligence:
             self.save_cache_to_disk()
 
             score = threat_data.get("abuseConfidenceScore", 0)
-            reports = threat_data.get("totalRerports" , 0)
+            reports = threat_data.get("totalReports" , 0)
             print(f"[Success] {ip} - Score: {score}% | Reports: {reports}")
 
             return self.cache[ip]
@@ -155,7 +155,7 @@ class ThreatIntelligence:
             print(f"[TIMEOUT] AbuseIPDB API took too long (>5s) for {ip}")
             return self.handle_error("API timeout (>5 seconds)", ip)
         except requests.RequestException as e:
-            print(f"[NETWORD ERROR] Failed to reach AbuseIPDB: {e}")
+            print(f"[NETWORK ERROR] Failed to reach AbuseIPDB: {e}")
             return self.handle_error(f"Network error:{str(e)}" , ip)
         except json.JSONDecodeError :
             print(f"[JSON ERROR] AbuseIPDB response was not valid JSON for {ip}")
@@ -164,3 +164,18 @@ class ThreatIntelligence:
             print(f"[ERROR] Unexpected error for: {ip}")
             return self.handle_error(str(e) , ip)
         
+    def enrich_attack(self , attack):
+        """
+        adds threat intelligence data to record
+        """
+
+        source_ip = attack.get('source_ip')
+
+        if not source_ip :
+            return attack
+        
+        data = self.get_threat_data(source_ip)
+
+        attack['threat_intelligence'] = data
+
+        return attack

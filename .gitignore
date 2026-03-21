@@ -1,8 +1,54 @@
-# Honeypot logs directory
+# Python & Dependencies
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+venv/
+env/
+
+# Environment & Secrets
+.env
+.env.local
+*.key
+*.pem
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+
+# Data & Logs
 Honeypot_logs/
-
-# JSONL files
+logs/
 *.jsonl
+*.csv
 
-#report
+# Reports & Exports
 attack_report.html
+*.pdf
+honeypot_report_*.pdf
+
+# ML Generated Files
+ml/charts/
+*.png
+*.jpg
+*.jpeg
+
+# Testing & Archives
+tests_archive/
+.pytest_cache/
+*.log
+
+# OS & Cache
+.DS_Store
+*.cache
+Thumbs.db
+
+# Project-specific
+/docs
+

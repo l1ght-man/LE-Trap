@@ -2,11 +2,11 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>HoneyPot Security Report</title>
+    <title>LE-Trap Security Report</title>
     <style>
         @page {
             size: letter;
-            margin: 2cm;
+            margin: 1cm;
         }
         
         body {
@@ -15,191 +15,200 @@
             color: #333;
         }
         
-        h1 {
-            font-size: 22pt;
-            color: #8b5cf6;
-            text-align: center;
-            margin: 0 0 5px 0;
+        .header {
+            background-color: #5B4B9D;
+            color: white;
             padding: 15px;
-            background-color: #f0f0f0;
-            border-bottom: 3px solid #8b5cf6;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .header h1 {
+            font-size: 22pt;
+            margin: 0;
+            font-weight: bold;
+        }
+        
+        .header .subtitle {
+            font-size: 11pt;
+            margin: 5px 0 0 0;
+        }
+        
+        .meta-info {
+            background-color: #f5f5f5;
+            border-left: 5px solid #5B4B9D;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 9pt;
+        }
+        
+        .meta-info p {
+            margin: 3px 0;
         }
         
         h2 {
-            font-size: 14pt;
-            color: #6366f1;
-            margin: 20px 0 10px 0;
-            padding: 5px 0;
-            border-bottom: 2px solid #e5e7eb;
-        }
-        
-        .subtitle {
-            text-align: center;
-            font-size: 10pt;
-            color: #666;
-            margin-bottom: 25px;
-        }
-        
-        .info-box {
-            background-color: #fffbeb;
-            border-left: 4px solid #f59e0b;
-            padding: 10px;
-            margin: 15px 0;
-            font-size: 9pt;
-        }
-        
-        .summary-item {
-            padding: 10px;
-            margin: 8px 0;
-            background-color: #f3f4f6;
-            border-left: 4px solid #8b5cf6;
-        }
-        
-        .summary-item strong {
-            color: #374151;
-            font-size: 9pt;
-        }
-        
-        .summary-item .big {
-            font-size: 18pt;
+            font-size: 12pt;
+            color: white;
+            background-color: #5B4B9D;
+            margin: 15px 0 10px 0;
+            padding: 8px 10px;
             font-weight: bold;
-            color: #8b5cf6;
-            display: block;
-            margin-top: 5px;
+        }
+        
+        .summary-grid {
+            margin-bottom: 15px;
+        }
+        
+        .summary-row {
+            margin-bottom: 10px;
+        }
+        
+        .summary-card {
+            background-color: #f0f4ff;
+            border: 2px solid #5B4B9D;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+        
+        .summary-card .label {
+            font-size: 8pt;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .summary-card .value {
+            font-size: 20pt;
+            font-weight: bold;
+            color: #5B4B9D;
         }
         
         table {
             width: 100%;
             border-collapse: collapse;
-            margin: 15px 0 25px 0;
-            font-size: 10pt;
+            margin: 10px 0 15px 0;
+            font-size: 9pt;
         }
         
         thead {
-            background-color: #6366f1;
+            background-color: #5B4B9D;
             color: white;
         }
         
         th {
-            padding: 12px 8px;
+            padding: 8px 6px;
             text-align: left;
             font-weight: bold;
-            font-size: 10pt;
+            font-size: 9pt;
         }
         
         td {
-            padding: 10px 8px;
-            border-bottom: 1px solid #e5e7eb;
-            vertical-align: middle;
-        }
-        
-        tbody tr {
-            background-color: white;
+            padding: 6px;
+            border-bottom: 1px solid #ddd;
         }
         
         tbody tr:nth-child(even) {
-            background-color: #f9fafb;
-        }
-        
-        td strong {
-            font-size: 11pt;
-            color: #1f2937;
+            background-color: #f9f9f9;
         }
         
         .badge {
-            padding: 4px 10px;
-            border: 2px solid;
-            font-size: 9pt;
+            padding: 3px 8px;
+            font-size: 7pt;
             font-weight: bold;
         }
         
         .badge-critical {
-            border-color: #991b1b;
-            color: #991b1b;
+            background-color: #ffcccc;
+            color: #8B0000;
         }
         
         .badge-high {
-            border-color: #9a3412;
-            color: #9a3412;
+            background-color: #ffd699;
+            color: #8B4513;
         }
         
         .badge-medium {
-            border-color: #92400e;
-            color: #92400e;
+            background-color: #ffff99;
+            color: #666600;
         }
         
         .badge-low {
-            border-color: #065f46;
-            color: #065f46;
+            background-color: #99ff99;
+            color: #006600;
         }
         
         .code {
             font-family: Courier, monospace;
-            padding: 3px 6px;
-            font-size: 9pt;
-            color: #1f2937;
-        }
-        
-        .footer {
-            margin-top: 30px;
-            padding-top: 10px;
-            border-top: 2px solid #e5e7eb;
-            text-align: center;
             font-size: 8pt;
-            color: #6b7280;
+            color: #666;
         }
         
         .rank {
-            padding: 4px 10px;
             font-weight: bold;
-            font-size: 9pt;
-            color: #6366f1;
-            border: 2px solid #6366f1;
+            color: #5B4B9D;
+        }
+        
+        .footer {
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 2px solid #ddd;
+            text-align: center;
+            font-size: 7pt;
+            color: #999;
         }
     </style>
 </head>
 <body>
-    <h1>HONEYPOT SECURITY REPORT</h1>
-    <div class="subtitle">Comprehensive Attack Analysis</div>
+    <div class="header">
+        <h1>HONEYPOT SECURITY REPORT</h1>
+        <p class="subtitle">Comprehensive Attack Analysis & Threat Intelligence</p>
+    </div>
     
-    <div class="info-box">
-        <strong>Report Generated:</strong> {{ report_date }}<br/>
-        <strong>Time Period:</strong> {{ time_range }}
+    <div class="meta-info">
+        <p><strong>Report Generated:</strong> {{ report_date }}</p>
+        <p><strong>Time Period:</strong> {{ time_range }}</p>
         {% if filters_applied %}
-        <br/><strong>Filters:</strong> IP: {{ ip_filter or 'All' }} | Port: {{ port_filter or 'All' }} | Event: {{ event_filter or 'All' }}
+        <p><strong>Filters Applied:</strong> IP: {{ ip_filter or 'All' }} | Port: {{ port_filter or 'All' }} | Event: {{ event_filter or 'All' }}</p>
         {% endif %}
     </div>
     
     <h2>EXECUTIVE SUMMARY</h2>
     
-    <div class="summary-item">
-        <strong>Total Attack Attempts</strong>
-        <span class="big">{{ "{:,}".format(stats.total_attacks) }}</span>
-    </div>
-    
-    <div class="summary-item">
-        <strong>Unique Attacker IPs</strong>
-        <span class="big">{{ stats.top_ips | length }}</span>
-    </div>
-    
-    <div class="summary-item">
-        <strong>Credentials Captured</strong>
-        <span class="big">{{ "{:,}".format(stats.credentials_captured) }}</span>
-    </div>
-    
-    <div class="summary-item">
-        <strong>Targeted Ports</strong>
-        <span class="big">{{ stats.ports | length }}</span>
+    <div class="summary-grid">
+        <div class="summary-row">
+            <div class="summary-card">
+                <div class="label">Total Attack Attempts</div>
+                <div class="value">{{ "{:,}".format(stats.total_attacks) }}</div>
+            </div>
+            
+            <div class="summary-card">
+                <div class="label">Unique Attacker IPs</div>
+                <div class="value">{{ stats.top_ips | length }}</div>
+            </div>
+        </div>
+        
+        <div class="summary-row">
+            <div class="summary-card">
+                <div class="label">Credentials Compromised</div>
+                <div class="value">{{ "{:,}".format(stats.credentials_captured) }}</div>
+            </div>
+            
+            <div class="summary-card">
+                <div class="label">Targeted Ports</div>
+                <div class="value">{{ stats.ports | length }}</div>
+            </div>
+        </div>
     </div>
     
     <h2>TOP ATTACKING IP ADDRESSES</h2>
     <table>
         <thead>
             <tr>
-                <th>Rank</th>
-                <th>IP Address</th>
-                <th>Attack Count</th>
-                <th>Threat Level</th>
+                <th style="width: 10%">Rank</th>
+                <th style="width: 30%">IP Address</th>
+                <th style="width: 30%">Attack Count</th>
+                <th style="width: 30%">Threat Level</th>
             </tr>
         </thead>
         <tbody>
@@ -228,19 +237,19 @@
     <table>
         <thead>
             <tr>
-                <th>Port</th>
-                <th>Service</th>
-                <th>Attack Count</th>
-                <th>Percentage</th>
+                <th style="width: 15%">Port</th>
+                <th style="width: 35%">Service</th>
+                <th style="width: 25%">Attack Count</th>
+                <th style="width: 25%">Percentage</th>
             </tr>
         </thead>
         <tbody>
             {% for port, count in sorted_ports[:8] %}
             <tr>
                 <td><span class="code">{{ port }}</span></td>
-                <td>{{ port_services.get(port|int, 'Unknown') }}</td>
+                <td><strong>{{ port_services.get(port|int, 'Unknown') }}</strong></td>
                 <td><strong>{{ "{:,}".format(count) }}</strong></td>
-                <td>{{ "%.1f"|format((count / total_port_attacks * 100) if total_port_attacks > 0 else 0) }}%</td>
+                <td><strong>{{ "%.1f"|format((count / total_port_attacks * 100) if total_port_attacks > 0 else 0) }}%</strong></td>
             </tr>
             {% endfor %}
         </tbody>
@@ -251,19 +260,19 @@
     <table>
         <thead>
             <tr>
-                <th>Time</th>
-                <th>Source IP</th>
-                <th>Event Type</th>
-                <th>Details</th>
+                <th style="width: 15%">Time</th>
+                <th style="width: 25%">Source IP</th>
+                <th style="width: 30%">Event Type</th>
+                <th style="width: 30%">Details</th>
             </tr>
         </thead>
         <tbody>
-            {% for log in logs[:8] %}
+            {% for log in logs[:10] %}
             <tr>
                 <td><span class="code">{{ log.timestamp_short }}</span></td>
-                <td><span class="code">{{ log.source_ip[:18] }}</span></td>
-                <td>{{ log.event_type }}</td>
-                <td><span class="code">{{ log.details[:30] }}</span></td>
+                <td><span class="code">{{ log.source_ip[:16] }}</span></td>
+                <td><strong>{{ log.event_type[:25] }}</strong></td>
+                <td><span class="code">{{ log.details[:35] }}</span></td>
             </tr>
             {% endfor %}
         </tbody>
@@ -271,8 +280,9 @@
     {% endif %}
     
     <div class="footer">
-        <p><strong>HoneyPot Monitoring System</strong></p>
-        <p>Confidential Security Report</p>
+        <p><strong>LE-Trap Monitoring System</strong></p>
+        <p>Enterprise Security & Threat Intelligence Platform</p>
+        <p style="margin-top: 8px; font-size: 7pt;">This report contains confidential security information.</p>
     </div>
 </body>
 </html>

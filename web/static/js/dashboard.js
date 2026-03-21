@@ -14,7 +14,7 @@ let activeFilters = {
     ip: '',
     port: '',
     event: '',
-    time: '24h' // Default to 24h
+    time: 'all' // Default to all time (show all enriched attacks)
 };
 
 // ============================================================================
@@ -29,9 +29,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load initial data
     loadStats();
+    loadMLMetrics();
     
     // Set up auto-refresh every 5 seconds
     statsUpdateInterval = setInterval(loadStats, 5000);
+    
+    // Refresh ML metrics every 10 seconds
+    setInterval(loadMLMetrics, 10000);
     
     // Initialize charts
     initCharts();
@@ -71,16 +75,16 @@ function initWebSocket() {
     });
     
     socket.on('stats_update', function(stats) {
-        console.log('📊 Stats update received:', stats);
+        console.log('[STATS] Update received:', stats);
         updateDashboard(stats);
     });
     
     socket.on('new_attack', function(attack) {
-        console.log('🚨 New attack:', attack);
+        console.log('[ATTACK] New attack:', attack);
         addToLiveFeed(attack);
         
         // Immediately refresh map (no delay)
-        console.log('🗺️ New attack detected - refreshing map immediately');
+        console.log('[MAP] Refreshing for new attack');
         setTimeout(() => loadMapData(), 500);
     });
 }
@@ -88,11 +92,11 @@ function initWebSocket() {
 function updateConnectionStatus(connected) {
     const statusEl = document.getElementById('connectionStatus');
     if (connected) {
-        statusEl.innerHTML = '<span class="dot"></span> Connected';
+        statusEl.innerHTML = '<span class="dot"></span> LIVE';
         statusEl.classList.add('connected');
         statusEl.classList.remove('disconnected');
     } else {
-        statusEl.innerHTML = '<span class="dot"></span> Disconnected';
+        statusEl.innerHTML = '<span class="dot"></span> OFFLINE';
         statusEl.classList.add('disconnected');
         statusEl.classList.remove('connected');
     }
@@ -129,20 +133,102 @@ async function loadStats() {
 function updateDashboard(stats) {
     // Update stat cards with smooth counting animation ONLY if values changed
     updateStatIfChanged('totalAttacks', stats.total_attacks || 0);
-    updateStatIfChanged('sshAttacks', stats.ports['22'] || 0);
-    updateStatIfChanged('telnetAttacks', stats.ports['23'] || 0);
-    updateStatIfChanged('httpAttacks', stats.ports['80'] || 0);
-    updateStatIfChanged('ftpAttacks', stats.ports['21'] || 0);
     updateStatIfChanged('credsCaptured', stats.credentials_captured || 0);
+    updateStatIfChanged('avgThreat', stats.avg_threat_score !== undefined ? stats.avg_threat_score + '%' : '--');
+    updateStatIfChanged('active24h', stats.total_attacks || 0); // Could filter by 24h later
     
     // Update top IPs
     updateTopIPs(stats.top_ips || []);
+    
+    // Update threat intelligence
+    updateThreatIntelligence(stats.threat_ips || []);
     
     // Update port chart
     updatePortChart(stats.ports || {});
     
     // Update timeline chart
     updateTimelineChart(stats.recent_events || []);
+    
+    // Update recent events in feed
+    if (stats.recent_events && stats.recent_events.length > 0) {
+        updateLiveFeed(stats.recent_events);
+    }
+    
+    // Update timestamp
+    updateTimestamp();
+}
+
+// Load ML metrics and update dashboard
+function loadMLMetrics() {
+    fetch('/api/ml-metrics')
+        .then(res => res.json())
+        .then(data => {
+            updateMLMetrics(data);
+        })
+        .catch(err => {
+            console.log('⚠ ML metrics not available:', err);
+        });
+}
+
+// Update ML metrics in dashboard
+function updateMLMetrics(data) {
+    // Update model performance
+    const baselineAccuracyEl = document.getElementById('baselineAccuracy');
+    const enhancedAccuracyEl = document.getElementById('enhancedAccuracy');
+    const improvementEl = document.getElementById('mlImprovement');
+    
+    if (baselineAccuracyEl) baselineAccuracyEl.textContent = 
+        (data.baseline_accuracy * 100).toFixed(2) + '%';
+    if (enhancedAccuracyEl) enhancedAccuracyEl.textContent = 
+        (data.enhanced_accuracy * 100).toFixed(2) + '%';
+    if (improvementEl) improvementEl.textContent = 
+        (data.improvement * 100).toFixed(2) + '%';
+    
+    // Update classification stats
+    const botCountEl = document.getElementById('botCount');
+    const botPercentEl = document.getElementById('botPercent');
+    const humanCountEl = document.getElementById('humanCount');
+    const humanPercentEl = document.getElementById('humanPercent');
+    
+    if (botCountEl) botCountEl.textContent = data.bot_count || 0;
+    if (botPercentEl) botPercentEl.textContent = 
+        (data.bot_percent * 100).toFixed(1) + '%';
+    if (humanCountEl) humanCountEl.textContent = data.human_count || 0;
+    if (humanPercentEl) humanPercentEl.textContent = 
+        (data.human_percent * 100).toFixed(1) + '%';
+    
+    // Update feature importance
+    if (data.feature_importance) {
+        updateFeatureImportance(data.feature_importance);
+    }
+}
+
+// Update feature importance bars
+function updateFeatureImportance(features) {
+    const container = document.getElementById('featureImportance');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    // Sort features by importance descending
+    const sorted = Object.entries(features)
+        .sort((a, b) => b[1] - a[1]);
+    
+    sorted.forEach(([name, importance]) => {
+        const pct = (importance * 100).toFixed(1);
+        const html = `
+            <div class="feature-bar">
+                <div class="feature-name">${name}</div>
+                <div class="bar-container">
+                    <div class="bar-fill" style="width: ${pct}%">
+                        <div class="bar-label">${pct}%</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.innerHTML += html;
+    });
+}
 
 // Helper to only update and animate when value changes
 function updateStatIfChanged(id, newValue) {
@@ -174,15 +260,6 @@ function animateValue(id, start, end, duration) {
         }
         element.textContent = Math.floor(current);
     }, 16);
-}
-    
-    // Update recent events in feed
-    if (stats.recent_events && stats.recent_events.length > 0) {
-        updateLiveFeed(stats.recent_events);
-    }
-    
-    // Update timestamp
-    updateTimestamp();
 }
 
 // ============================================================================
@@ -525,8 +602,45 @@ function updateTopIPs(topIPs) {
 }
 
 // ============================================================================
-// Live Feed
+// Threat Intelligence
 // ============================================================================
+
+function updateThreatIntelligence(threatIPs) {
+    const container = document.getElementById('threatIntel');
+    
+    if (!threatIPs || threatIPs.length === 0) {
+        container.innerHTML = `
+            <div class="threat-item">
+                <span class="threat-placeholder">No threats detected</span>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = threatIPs.slice(0, 10).map((item, index) => {
+        let riskClass = 'safe';
+        let riskLabel = 'SAFE';
+        const score = item.abuse_score || 0;
+        
+        if (score >= 75) {
+            riskClass = 'critical';
+            riskLabel = 'CRITICAL';
+        } else if (score >= 25) {
+            riskClass = 'warning';
+            riskLabel = 'WARNING';
+        }
+        
+        const torTag = item.is_tor ? `<span class="threat-tag tor">TOR</span>` : '';
+        
+        return `
+            <div class="threat-item" style="--delay: ${index}">
+                <span class="threat-ip">${item.ip}</span>
+                <span class="threat-score ${riskClass}">${score}%</span>
+                ${torTag}
+            </div>
+        `;
+    }).join('');
+}
 
 function updateLiveFeed(events) {
     const feed = document.getElementById('liveFeed');
@@ -556,37 +670,42 @@ function updateLiveFeed(events) {
                            event.credentials;
         const isCommand = event.event_type?.startsWith('CMD:');
         
-        let text = '';
-        let icon = '';
+        // Get threat intelligence data
+        const threat = event.threat_intelligence || {};
+        const threatData = threat.threat_data || {};
+        const abuseScore = threatData.abuseConfidenceScore || 0;
         
-        // Format based on event type
-        if (isCommand) {
-            icon = '💻';
-            const command = event.event_type.replace('CMD: ', '');
-            text = `<span class="feed-ip">${event.source_ip}</span> executed: <code>${command}</code>`;
-        } else if (isCredential) {
-            icon = '🔑';
-            if (event.credentials) {
-                text = `<span class="feed-ip">${event.source_ip}</span> 🚨 Credentials: <strong>${event.credentials.username}</strong> / <strong>${event.credentials.password}</strong>`;
-            } else {
-                text = `<span class="feed-ip">${event.source_ip}</span> logged in via ${event.service.toUpperCase()}`;
-            }
-        } else {
-            icon = '🎯';
-            text = `<span class="feed-ip">${event.source_ip}</span> [${event.service?.toUpperCase() || 'UNKNOWN'}] ${event.event_type || 'Connection'}`;
+        // Determine risk level
+        let riskLevel = 'low';
+        let riskLabel = 'SAFE';
+        if (abuseScore >= 75) {
+            riskLevel = 'high';
+            riskLabel = 'CRITICAL';
+        } else if (abuseScore >= 25) {
+            riskLevel = 'medium';
+            riskLabel = 'WARNING';
         }
         
-        if (event.details && event.details.length > 0 && !isCommand) {
-            text += ` <span class="feed-detail">${event.details.substring(0, 60)}</span>`;
+        // Determine event type label
+        let eventType = 'CONNECTION';
+        if (isCredential) {
+            eventType = 'CREDENTIALS_CAPTURED';
+        } else if (isCommand) {
+            eventType = 'COMMAND_EXECUTION';
+        } else if (event.event_type) {
+            eventType = event.event_type.replace(/_/g, '_');
         }
         
         const feedItem = document.createElement('div');
-        feedItem.className = `feed-item ${isCredential ? 'credential' : ''} ${isCommand ? 'command' : ''}`;
+        feedItem.className = `attack-item ${riskLevel}`;
         feedItem.dataset.timestamp = event.timestamp;
         feedItem.innerHTML = `
-            <span class="feed-icon">${icon}</span>
-            <span class="feed-time">${time}</span>
-            <span class="feed-text">${text}</span>
+            <div class="attack-header">
+                <div class="attack-type">${eventType}</div>
+                <div class="risk-badge ${riskLevel}">${riskLabel}</div>
+            </div>
+            <div class="attack-ip">${event.source_ip}<span class="attack-arrow">→</span>${event.service?.toUpperCase()}<span class="attack-arrow">:</span>${event.port || '?'}</div>
+            <div class="attack-timestamp">${time}</div>
         `;
         
         feed.insertBefore(feedItem, feed.firstChild);
@@ -600,33 +719,74 @@ function updateLiveFeed(events) {
 
 function addToLiveFeed(attack) {
     const feed = document.getElementById('liveFeed');
-    const time = new Date().toLocaleTimeString();
+    const time = new Date(attack.timestamp || new Date()).toLocaleTimeString('en-US', {hour12: false});
+    
+    // Remove placeholder if it exists
+    const placeholder = feed.querySelector('.feed-placeholder');
+    if (placeholder) {
+        placeholder.remove();
+    }
     
     const isCredential = attack.credentials || attack.event_type === 'CREDENTIAL_SUBMISSION' || attack.event_type === 'SSH_LOGIN';
     const isCommand = attack.event_type?.startsWith('CMD:');
     
-    let text = '';
-    let icon = '';
-    
-    if (isCommand) {
-        icon = '💻';
-        const command = attack.event_type.replace('CMD: ', '');
-        text = `<span class="feed-ip">${attack.source_ip}</span> executed: <code>${command}</code>`;
-    } else if (isCredential) {
-        icon = '🔑';
-        text = `<span class="feed-ip">${attack.source_ip}</span> 🚨 Login detected`;
-    } else {
-        icon = '🎯';
-        text = `<span class="feed-ip">${attack.source_ip}</span> [${attack.service?.toUpperCase()}] ${attack.event_type}`;
+    // Determine event type label
+    let eventType = 'CONNECTION';
+    if (isCredential) {
+        eventType = 'CREDENTIALS_CAPTURED';
+    } else if (isCommand) {
+        eventType = 'COMMAND_EXECUTION';
+    } else if (attack.event_type) {
+        eventType = attack.event_type.replace(/_/g, '_');
     }
     
+    // Get threat intelligence data
+    const threat = attack.threat_intelligence || {};
+    const threatData = threat.threat_data || {};
+    const abuseScore = threatData.abuseConfidenceScore || 0;
+    const totalReports = threatData.totalReports || 0;
+    const isTor = threatData.isTor || false;
+    
+    // Determine risk level
+    let riskLevel = 'low';
+    let riskLabel = 'SAFE';
+    if (abuseScore >= 75) {
+        riskLevel = 'high';
+        riskLabel = 'CRITICAL';
+    } else if (abuseScore >= 25) {
+        riskLevel = 'medium';
+        riskLabel = 'WARNING';
+    }
+    
+    // Build details string
+    let details = [];
+    if (attack.credentials) {
+        details.push(`AUTH: ${attack.credentials}`);
+    } else if (isCommand) {
+        const command = attack.event_type.replace('CMD: ', '');
+        details.push(`CMD: ${command}`);
+    }
+    
+    if (threat.status === 'success') {
+        if (isTor) details.push('TOR_EXIT');
+        details.push(`SCORE: ${abuseScore}%`);
+        if (totalReports > 0) details.push(`REPORTS: ${totalReports}`);
+        if (threatData.isWhitelisted) details.push('WHITELISTED');
+    }
+    
+    const detailsStr = details.join('<span class="detail-separator">|</span>');
+    
     const feedItem = document.createElement('div');
-    feedItem.className = `feed-item ${isCredential ? 'credential' : ''} ${isCommand ? 'command' : ''}`;
+    feedItem.className = `attack-item ${riskLevel}`;
     feedItem.dataset.timestamp = attack.timestamp || new Date().toISOString();
     feedItem.innerHTML = `
-        <span class="feed-icon">${icon}</span>
-        <span class="feed-time">${time}</span>
-        <span class="feed-text">${text}</span>
+        <div class="attack-header">
+            <div class="attack-type">${eventType}</div>
+            <div class="risk-badge ${riskLevel}">${riskLabel}</div>
+        </div>
+        <div class="attack-ip">${attack.source_ip}<span class="attack-arrow">→</span>${attack.service?.toUpperCase()}<span class="attack-arrow">:</span>${attack.port || '?'}</div>
+        ${detailsStr ? `<div class="attack-details">${detailsStr}</div>` : ''}
+        <div class="attack-timestamp">${time}</div>
     `;
     
     feed.insertBefore(feedItem, feed.firstChild);
@@ -665,8 +825,12 @@ async function loadMapData() {
     const placeholder = document.getElementById('mapPlaceholder');
     const mapElement = document.getElementById('attackMap');
     
-    // Show loading state
-    placeholder.innerHTML = '<p>🔄 Loading map data...</p>';
+    // Only show loading state if map hasn't loaded yet
+    if (!attackMap) {
+        placeholder.style.display = 'block';
+        placeholder.innerHTML = '<p>Loading map...</p>';
+        mapElement.style.display = 'none';
+    }
     
     try {
         const response = await fetch('/api/map-data');
@@ -677,46 +841,88 @@ async function loadMapData() {
             placeholder.style.display = 'none';
             mapElement.style.display = 'block';
             
-            // Initialize or update map
-            initMap(data.attacks);
+            // Give the DOM time to render before initializing Leaflet (only on first load)
+            setTimeout(() => {
+                initMap(data.attacks);
+            }, 50);
         } else {
+            placeholder.style.display = 'block';
             placeholder.innerHTML = `
-                <p>📍 No attack data available yet</p>
-                <button onclick="window.honeypotDashboard.loadMapData()" class="btn-small">Refresh Map</button>
+                <p>📍 No attack data available</p>
+                <button onclick="loadMapData()" class="btn-small">Refresh</button>
             `;
         }
     } catch (error) {
         console.error('Error loading map data:', error);
+        placeholder.style.display = 'block';
         placeholder.innerHTML = `
-            <p>⚠️ Error loading map data</p>
-            <button onclick="window.honeypotDashboard.loadMapData()" class="btn-small">Retry</button>
+            <p>⚠️ Error loading map</p>
+            <button onclick="loadMapData()" class="btn-small">Retry</button>
         `;
     }
 }
 
 function initMap(attacks) {
     console.log('🗺️ Initializing map with', attacks.length, 'locations');
+    console.log('Leaflet available:', typeof L !== 'undefined');
     
     // Update counter
-    document.getElementById('mapCount').textContent = `${attacks.length} locations`;
+    document.getElementById('mapCount').textContent = `${attacks.length} LOCATIONS`;
     
     // Filter attacks that have coordinates
     const validAttacks = attacks.filter(a => a.lat && a.lon);
     
     if (validAttacks.length === 0) {
-        console.warn('No attacks with valid coordinates');
+        console.warn('⚠️ No attacks with valid coordinates');
+        document.getElementById('mapPlaceholder').style.display = 'block';
+        document.getElementById('mapPlaceholder').innerHTML = '<p>No attack location data available</p>';
+        document.getElementById('attackMap').style.display = 'none';
+        return;
+    }
+    
+    // Check if Leaflet is loaded
+    if (typeof L === 'undefined') {
+        console.error('❌ Leaflet not loaded!');
         return;
     }
     
     // Create map if it doesn't exist
     if (!attackMap) {
-        attackMap = L.map('attackMap').setView([20, 0], 2);
-        
-        // Add tile layer (map background)
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors',
-            maxZoom: 18
-        }).addTo(attackMap);
+        try {
+            const mapElement = document.getElementById('attackMap');
+            if (!mapElement) {
+                console.error('❌ Map element not found!');
+                return;
+            }
+            
+            attackMap = L.map('attackMap', {
+                center: [20, 0],
+                zoom: 2,
+                minZoom: 2,
+                maxZoom: 18,
+                worldCopyJump: true,
+                zoomControl: true
+            });
+            
+            // Use dark tile layer that matches our theme
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '© OpenStreetMap, © CARTO',
+                maxZoom: 18,
+                minZoom: 2,
+                noWrap: false
+            }).addTo(attackMap);
+            
+            // Force map to recognize container dimensions
+            setTimeout(() => {
+                attackMap.invalidateSize();
+                console.log('✅ Map size validated');
+            }, 100);
+        } catch (error) {
+            console.error('❌ Error creating map:', error);
+            document.getElementById('mapPlaceholder').style.display = 'block';
+            document.getElementById('mapPlaceholder').innerHTML = `<p>Error initializing map: ${error.message}</p>`;
+            return;
+        }
     } else {
         // Clear existing markers
         attackMap.eachLayer(layer => {
@@ -825,7 +1031,11 @@ function applyFilters() {
     activeFilters.port = document.getElementById('filterPort').value;
     activeFilters.event = document.getElementById('filterEvent').value;
     
-    // Filter feed items
+    // Reload stats and map from backend with filters applied
+    loadStats();
+    loadMapData();
+    
+    // Also filter feed items for immediate visual feedback
     const feed = document.getElementById('liveFeed');
     const items = Array.from(feed.querySelectorAll('.feed-item'));
     
@@ -875,12 +1085,13 @@ function clearAllFilters() {
     document.getElementById('filterIP').value = '';
     document.getElementById('filterPort').value = '';
     document.getElementById('filterEvent').value = '';
-    document.getElementById('filterTime').value = '24h';
+    document.getElementById('filterTime').value = 'all';
     
-    activeFilters = { ip: '', port: '', event: '', time: '24h' };
+    activeFilters = { ip: '', port: '', event: '', time: 'all' };
     
     // Reload data from backend
     loadStats();
+    loadMapData();
     
     // Show all items in feed
     const feed = document.getElementById('liveFeed');
