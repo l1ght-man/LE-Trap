@@ -335,7 +335,7 @@ We welcome contributions:
 
 ### AI Assistance Disclosure
 
-This project was developed with AI assistance (GitHub Copilot) for specific implementation tasks.
+This project was developed with AI assistance  for specific implementation tasks.
 
 **What was built independently:**
 - System architecture and design
