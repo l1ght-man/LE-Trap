@@ -2,18 +2,22 @@
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 *.egg-info/
 dist/
 build/
 .pytest_cache/
 venv/
 env/
+*.so
 
 # Environment & Secrets
 .env
 .env.local
+.env.production
 *.key
 *.pem
+config/secrets.yaml
 
 # IDE & Editors
 .vscode/
@@ -21,37 +25,64 @@ env/
 *.swp
 *.swo
 *.sublime-project
+*.sublime-workspace
+.spyderproject
+.spyproject
 
-# Data & Logs
-Honeypot_logs/
+# Data & Logs (Generated Content)
 logs/
+data/
 *.jsonl
 *.csv
-data/*.json
-data/ip_cache.json
-data/threat_cache.json
+*.json
+!requirements.txt
 
-# Reports & Exports
+# Reports & Exports (keep demo folder)
 attack_report.html
 *.pdf
 honeypot_report_*.pdf
+honeypot_export_*.csv
+!demo/*.png
+!demo/*.mp4
 
-# ML Generated Files
+# ML Generated Files (except demo assets)
 ml/charts/
+ml/data/
 *.png
 *.jpg
 *.jpeg
+!demo/
 
-# Testing & Archives
+# Testing & Archives (Complete exclusion)
 tests_archive/
 .pytest_cache/
 *.log
+coverage/
+htmlcov/
+.coverage
+.tox/
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+*.orig
 
 # OS & Cache
 .DS_Store
 *.cache
 Thumbs.db
+desktop.ini
+.directory
 
-# Project-specific
-/docs
+# Docker volumes & runtime
+.docker/
+docker-data/
+volumes/
+
+# Project-specific exclusions
+/docs/build/
+node_modules/
+.npm/
+package-lock.json
 

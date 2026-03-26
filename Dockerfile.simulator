@@ -1,0 +1,13 @@
+FROM python:3.11-slim
+
+# Install dependencies
+RUN pip install requests
+
+# Copy attack simulator
+COPY tests/attack_simulator.py /app/attack_simulator.py
+WORKDIR /app
+
+# Set the target to the honeypot service name
+ENV TARGET_HOST=honeypot-main
+
+ENTRYPOINT ["python", "attack_simulator.py"]

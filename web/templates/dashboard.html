@@ -16,17 +16,25 @@
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20260323ll">
 </head>
 <body>
     <!-- Header -->
     <header class="header">
         <div class="container">
-            <h1>[ LE-TRAP MONITORING ]</h1>
-            <div class="status">
-                <span class="status-indicator" id="connectionStatus">
-                    <span class="dot"></span> CONNECTING...
-                </span>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h1>[ LE-TRAP MONITORING ]</h1>
+                <div style="display: flex; gap: 30px; align-items: center;">
+                    <div style="text-align: right;">
+                        <div style="font-size: 10px; color: #666; letter-spacing: 2px;">UPTIME</div>
+                        <div id="systemUptime" style="font-size: 18px; font-weight: 700; color: #ffc107;">--</div>
+                    </div>
+                    <div class="status">
+                        <span class="status-indicator" id="connectionStatus">
+                            <span class="dot"></span> CONNECTING...
+                        </span>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
@@ -98,6 +106,7 @@
                         <button id="clearFilters" class="btn-export">Clear</button>
                         <button id="exportCSV" class="btn-export">CSV</button>
                         <button id="exportPDF" class="btn-export">PDF</button>
+                        <button id="clearData" class="btn-danger">Clear Data</button>
                     </div>
                 </div>
             </div>
@@ -115,8 +124,8 @@
                         <span class="panel-badge" id="mapCount">0 LOCATIONS</span>
                     </div>
                     <div class="panel-body">
-                        <div id="attackMap" style="display: none;"></div>
-                        <div class="map-placeholder" id="mapPlaceholder">
+                        <div id="attackMap"></div>
+                        <div class="map-placeholder" id="mapPlaceholder" style="display: none;">
                             <p>🔄 Loading map data...</p>
                         </div>
                     </div>
@@ -234,13 +243,17 @@
                         <div id="classification" class="classification-container">
                             <div class="class-item">
                                 <span class="class-label">Bot Attacks:</span>
-                                <span class="class-count" id="botCount">0</span>
-                                <span class="class-percent" id="botPercent">0%</span>
+                                <div class="class-stats">
+                                    <span class="class-count" id="botCount">0</span>
+                                    <span class="class-percent" id="botPercent">0%</span>
+                                </div>
                             </div>
                             <div class="class-item">
                                 <span class="class-label">Human Attacks:</span>
-                                <span class="class-count" id="humanCount">0</span>
-                                <span class="class-percent" id="humanPercent">0%</span>
+                                <div class="class-stats">
+                                    <span class="class-count" id="humanCount">0</span>
+                                    <span class="class-percent" id="humanPercent">0%</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -297,7 +310,24 @@
         </div>
     </footer>
 
+    <!-- Clear Data Confirmation Modal -->
+    <div id="clearDataModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2>⚠️ WARNING: Delete All Data</h2>
+            <p>This will <strong>permanently delete ALL attack logs</strong>.</p>
+            <p>This action <strong>cannot be undone</strong>.</p>
+            <div class="modal-input-group">
+                <label>Type <strong>DELETE</strong> to confirm:</label>
+                <input type="text" id="deleteConfirmInput" placeholder="DELETE" autocomplete="off">
+            </div>
+            <div class="modal-buttons">
+                <button id="confirmDelete" class="btn-danger" disabled>Delete All Data</button>
+                <button id="cancelDelete" class="btn-export">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Custom JavaScript -->
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260323ll"></script>
 </body>
 </html>

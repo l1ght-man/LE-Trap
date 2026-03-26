@@ -22,7 +22,7 @@ let activeFilters = {
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🐻 HoneyPot Dashboard Loading...');
+    console.log('[LOG] Dashboard event');
     
     // Initialize WebSocket connection
     initWebSocket();
@@ -31,8 +31,11 @@ document.addEventListener('DOMContentLoaded', function() {
     loadStats();
     loadMLMetrics();
     
-    // Set up auto-refresh every 5 seconds
-    statsUpdateInterval = setInterval(loadStats, 5000);
+    // Set up auto-refresh every 5 seconds (stats + map together)
+    setInterval(() => {
+        loadStats();
+        loadMapData();
+    }, 5000);
     
     // Refresh ML metrics every 10 seconds
     setInterval(loadMLMetrics, 10000);
@@ -41,16 +44,10 @@ document.addEventListener('DOMContentLoaded', function() {
     initCharts();
     loadMapData();
     
-    // Auto-refresh map every 5 seconds
-    setInterval(() => {
-        console.log('🔄 Auto-refreshing map...');
-        loadMapData();
-    }, 5000);
-    
     // Setup filter listeners
     setupFilters();
     
-    console.log('✅ Dashboard Ready');
+    console.log('[LOG] Dashboard event');
 });
 
 // ============================================================================
@@ -61,12 +58,12 @@ function initWebSocket() {
     socket = io();
     
     socket.on('connect', function() {
-        console.log('✅ WebSocket Connected');
+        console.log('[LOG] Dashboard event');
         updateConnectionStatus(true);
     });
     
     socket.on('disconnect', function() {
-        console.log('❌ WebSocket Disconnected');
+        console.log('[LOG] Dashboard event');
         updateConnectionStatus(false);
     });
     
@@ -82,6 +79,9 @@ function initWebSocket() {
     socket.on('new_attack', function(attack) {
         console.log('[ATTACK] New attack:', attack);
         addToLiveFeed(attack);
+        
+        // Refresh stats immediately
+        loadStats();
         
         // Immediately refresh map (no delay)
         console.log('[MAP] Refreshing for new attack');
@@ -134,8 +134,13 @@ function updateDashboard(stats) {
     // Update stat cards with smooth counting animation ONLY if values changed
     updateStatIfChanged('totalAttacks', stats.total_attacks || 0);
     updateStatIfChanged('credsCaptured', stats.credentials_captured || 0);
-    updateStatIfChanged('avgThreat', stats.avg_threat_score !== undefined ? stats.avg_threat_score + '%' : '--');
-    updateStatIfChanged('active24h', stats.total_attacks || 0); // Could filter by 24h later
+    updateStatIfChanged('avgThreat', stats.avg_threat_score || 0);
+    updateStatIfChanged('active24h', stats.active_ips_24h || 0);
+    
+    // Update uptime in header
+    if (stats.uptime) {
+        document.getElementById('systemUptime').textContent = stats.uptime;
+    }
     
     // Update top IPs
     updateTopIPs(stats.top_ips || []);
@@ -235,7 +240,13 @@ function updateStatIfChanged(id, newValue) {
     const element = document.getElementById(id);
     if (!element) return;
     
-    const currentValue = parseInt(element.textContent) || 0;
+    // Handle different formats (number or string with suffix)
+    let currentValue = 0;
+    if (id === 'avgThreat') {
+        currentValue = parseInt(element.textContent) || 0;
+    } else {
+        currentValue = parseInt(element.textContent) || 0;
+    }
     
     // Only animate if value actually changed
     if (currentValue !== newValue) {
@@ -258,7 +269,13 @@ function animateValue(id, start, end, duration) {
             current = end;
             clearInterval(timer);
         }
-        element.textContent = Math.floor(current);
+        const displayValue = Math.floor(current);
+        // Add percentage for threat score
+        if (id === 'avgThreat') {
+            element.textContent = displayValue + '%';
+        } else {
+            element.textContent = displayValue;
+        }
     }, 16);
 }
 
@@ -631,12 +648,30 @@ function updateThreatIntelligence(threatIPs) {
         }
         
         const torTag = item.is_tor ? `<span class="threat-tag tor">TOR</span>` : '';
+        const countryTag = item.country ? `<span class="threat-tag country">${item.country}</span>` : '';
+        const reportsTag = `<span class="threat-tag reports">${item.total_reports} reports</span>`;
+        
+        let detailsHTML = '';
+        if (item.isp || item.num_distinct_users || item.usage_type) {
+            detailsHTML = `<div class="threat-details">
+                ${item.isp ? `<div class="threat-detail-row"><span class="threat-detail-label">ISP:</span><span class="threat-detail-value">${item.isp}</span></div>` : ''}
+                ${item.num_distinct_users ? `<div class="threat-detail-row"><span class="threat-detail-label">Users:</span><span class="threat-detail-value">${item.num_distinct_users}</span></div>` : ''}
+                ${item.usage_type ? `<div class="threat-detail-row"><span class="threat-detail-label">Type:</span><span class="threat-detail-value">${item.usage_type}</span></div>` : ''}
+            </div>`;
+        }
         
         return `
-            <div class="threat-item" style="--delay: ${index}">
-                <span class="threat-ip">${item.ip}</span>
-                <span class="threat-score ${riskClass}">${score}%</span>
-                ${torTag}
+            <div class="threat-item threat-${riskClass}" style="--delay: ${index}">
+                <div class="threat-header">
+                    <span class="threat-ip">${item.ip}</span>
+                    <span class="threat-score ${riskClass}">${score}%</span>
+                </div>
+                <div class="threat-tags">
+                    ${torTag}
+                    ${countryTag}
+                    ${reportsTag}
+                </div>
+                ${detailsHTML}
             </div>
         `;
     }).join('');
@@ -822,49 +857,40 @@ function updateTimestamp() {
 // ============================================================================
 
 async function loadMapData() {
+    console.log('[MAP] loadMapData() called');
     const placeholder = document.getElementById('mapPlaceholder');
     const mapElement = document.getElementById('attackMap');
     
-    // Only show loading state if map hasn't loaded yet
-    if (!attackMap) {
-        placeholder.style.display = 'block';
-        placeholder.innerHTML = '<p>Loading map...</p>';
-        mapElement.style.display = 'none';
-    }
+    console.log('[MAP] Elements found:', {placeholder: !!placeholder, mapElement: !!mapElement});
     
     try {
+        console.log('[MAP] Fetching /api/map-data...');
         const response = await fetch('/api/map-data');
         const data = await response.json();
+        console.log('[MAP] Received data:', data);
         
-        if (data.attacks && data.attacks.length > 0) {
-            // Hide placeholder, show map
-            placeholder.style.display = 'none';
-            mapElement.style.display = 'block';
-            
-            // Give the DOM time to render before initializing Leaflet (only on first load)
-            setTimeout(() => {
-                initMap(data.attacks);
-            }, 50);
-        } else {
-            placeholder.style.display = 'block';
-            placeholder.innerHTML = `
-                <p>📍 No attack data available</p>
-                <button onclick="loadMapData()" class="btn-small">Refresh</button>
-            `;
-        }
+        // Always show map, hide placeholder
+        placeholder.style.display = 'none';
+        mapElement.style.display = 'block';
+        
+        // Initialize map (will show empty if no attacks)
+        setTimeout(() => {
+            initMap(data.attacks || []);
+        }, 50);
+        
     } catch (error) {
-        console.error('Error loading map data:', error);
-        placeholder.style.display = 'block';
-        placeholder.innerHTML = `
-            <p>⚠️ Error loading map</p>
-            <button onclick="loadMapData()" class="btn-small">Retry</button>
-        `;
+        console.error('[MAP ERROR] Failed to load map data:', error);
+        // Still show empty map on error
+        placeholder.style.display = 'none';
+        mapElement.style.display = 'block';
+        setTimeout(() => {
+            initMap([]);
+        }, 50);
     }
 }
 
 function initMap(attacks) {
     console.log('🗺️ Initializing map with', attacks.length, 'locations');
-    console.log('Leaflet available:', typeof L !== 'undefined');
     
     // Update counter
     document.getElementById('mapCount').textContent = `${attacks.length} LOCATIONS`;
@@ -872,17 +898,9 @@ function initMap(attacks) {
     // Filter attacks that have coordinates
     const validAttacks = attacks.filter(a => a.lat && a.lon);
     
-    if (validAttacks.length === 0) {
-        console.warn('⚠️ No attacks with valid coordinates');
-        document.getElementById('mapPlaceholder').style.display = 'block';
-        document.getElementById('mapPlaceholder').innerHTML = '<p>No attack location data available</p>';
-        document.getElementById('attackMap').style.display = 'none';
-        return;
-    }
-    
     // Check if Leaflet is loaded
     if (typeof L === 'undefined') {
-        console.error('❌ Leaflet not loaded!');
+        console.error('[ERROR] Leaflet not loaded');
         return;
     }
     
@@ -891,7 +909,7 @@ function initMap(attacks) {
         try {
             const mapElement = document.getElementById('attackMap');
             if (!mapElement) {
-                console.error('❌ Map element not found!');
+                console.error('[ERROR] Map element not found');
                 return;
             }
             
@@ -901,7 +919,9 @@ function initMap(attacks) {
                 minZoom: 2,
                 maxZoom: 18,
                 worldCopyJump: true,
-                zoomControl: true
+                zoomControl: true,
+                maxBounds: [[-90, -Infinity], [90, Infinity]], // Limit only vertical panning
+                maxBoundsViscosity: 1.0 // Make bounds "hard"
             });
             
             // Use dark tile layer that matches our theme
@@ -915,35 +935,41 @@ function initMap(attacks) {
             // Force map to recognize container dimensions
             setTimeout(() => {
                 attackMap.invalidateSize();
-                console.log('✅ Map size validated');
+                console.log('[MAP] Initialized');
             }, 100);
         } catch (error) {
-            console.error('❌ Error creating map:', error);
-            document.getElementById('mapPlaceholder').style.display = 'block';
-            document.getElementById('mapPlaceholder').innerHTML = `<p>Error initializing map: ${error.message}</p>`;
+            console.error('[ERROR] Map initialization failed:', error);
             return;
         }
     } else {
         // Clear existing markers
-        attackMap.eachLayer(layer => {
-            if (layer instanceof L.Marker) {
-                attackMap.removeLayer(layer);
-            }
-        });
+        try {
+            attackMap.eachLayer(layer => {
+                if (layer instanceof L.Marker) {
+                    attackMap.removeLayer(layer);
+                }
+            });
+        } catch (error) {
+            console.error('[MAP] Error clearing markers:', error);
+        }
     }
     
-    // Add markers for each attack
+    // Add markers for each attack (with error handling)
     validAttacks.forEach(attack => {
-        const marker = L.marker([attack.lat, attack.lon]).addTo(attackMap);
-        
-        // Create popup content
-        const popupContent = `
-            <strong>IP:</strong> ${attack.ip}<br>
-            <strong>Location:</strong> ${attack.city || 'Unknown'}, ${attack.country || 'Unknown'}<br>
-            <strong>Attacks:</strong> ${attack.count}
-        `;
-        
-        marker.bindPopup(popupContent);
+        try {
+            const marker = L.marker([attack.lat, attack.lon]).addTo(attackMap);
+            
+            // Create popup content
+            const popupContent = `
+                <strong>IP:</strong> ${attack.ip}<br>
+                <strong>Location:</strong> ${attack.city || 'Unknown'}, ${attack.country || 'Unknown'}<br>
+                <strong>Attacks:</strong> ${attack.count}
+            `;
+            
+            marker.bindPopup(popupContent);
+        } catch (error) {
+            console.error('[MAP] Error adding marker for', attack.ip, error);
+        }
     });
     
     console.log('✅ Map initialized with', validAttacks.length, 'markers');
@@ -966,7 +992,7 @@ function refreshMapForNewIP(attack) {
         // Debounce map refresh (wait 2 seconds for multiple IPs)
         clearTimeout(mapRefreshTimeout);
         mapRefreshTimeout = setTimeout(() => {
-            console.log('🔄 Refreshing map with new IPs...');
+            console.log('[LOG] Dashboard event');
             loadMapData();
         }, 2000);
     }
@@ -983,7 +1009,7 @@ window.honeypotDashboard = {
     socket
 };
 
-console.log('💡 Debugging available via: window.honeypotDashboard');
+console.log('[LOG] Dashboard event');
 
 // ============================================================================
 // Filtering System
@@ -997,6 +1023,7 @@ function setupFilters() {
     const clearBtn = document.getElementById('clearFilters');
     const exportCSV = document.getElementById('exportCSV');
     const exportPDF = document.getElementById('exportPDF');
+    const clearDataBtn = document.getElementById('clearData');
     
     // Add event listeners
     filterIP.addEventListener('input', applyFilters);
@@ -1006,6 +1033,7 @@ function setupFilters() {
     clearBtn.addEventListener('click', clearAllFilters);
     exportCSV.addEventListener('click', handleExportCSV);
     exportPDF.addEventListener('click', handleExportPDF);
+    if (clearDataBtn) clearDataBtn.addEventListener('click', handleClearData);
 }
 
 function onTimeFilterChange() {
@@ -1037,7 +1065,7 @@ function applyFilters() {
     
     // Also filter feed items for immediate visual feedback
     const feed = document.getElementById('liveFeed');
-    const items = Array.from(feed.querySelectorAll('.feed-item'));
+    const items = Array.from(feed.querySelectorAll('.attack-item'));
     
     items.forEach(item => {
         let show = true;
@@ -1088,17 +1116,83 @@ function clearAllFilters() {
     document.getElementById('filterTime').value = 'all';
     
     activeFilters = { ip: '', port: '', event: '', time: 'all' };
-    
-    // Reload data from backend
     loadStats();
     loadMapData();
+    console.log('Filters cleared');
+}
+
+function handleClearData() {
+    console.log('[DEBUG] Clear data button clicked');
     
-    // Show all items in feed
-    const feed = document.getElementById('liveFeed');
-    const items = feed.querySelectorAll('.feed-item');
-    items.forEach(item => item.style.display = 'flex');
+    // Show custom modal
+    const modal = document.getElementById('clearDataModal');
+    const input = document.getElementById('deleteConfirmInput');
+    const confirmBtn = document.getElementById('confirmDelete');
+    const cancelBtn = document.getElementById('cancelDelete');
     
-    console.log('🔍 Filters cleared');
+    modal.style.display = 'flex';
+    input.value = '';
+    confirmBtn.disabled = true;
+    
+    // Enable confirm button only when "DELETE" is typed
+    const checkInput = () => {
+        confirmBtn.disabled = input.value !== 'DELETE';
+    };
+    
+    input.addEventListener('input', checkInput);
+    input.focus();
+    
+    // Handle cancel
+    const closeModal = () => {
+        modal.style.display = 'none';
+        input.removeEventListener('input', checkInput);
+    };
+    
+    cancelBtn.onclick = () => {
+        console.log('[DEBUG] Clear data cancelled by user');
+        closeModal();
+    };
+    
+    // Handle confirm
+    confirmBtn.onclick = () => {
+        console.log('[DEBUG] Confirmation passed, calling API...');
+        closeModal();
+        
+        fetch('/api/clear-data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('[DEBUG] API response:', data);
+            if (data.success) {
+                // Show success message with custom alert
+                const successDiv = document.createElement('div');
+                successDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #4caf50; color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 10001; font-weight: 600;';
+                successDiv.textContent = `Deleted ${data.deleted} file(s) successfully`;
+                document.body.appendChild(successDiv);
+                
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('[DEBUG] Error clearing data:', error);
+            alert('Failed to clear data: ' + error);
+        });
+    };
+    
+    // Close on Escape key
+    const escapeHandler = (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    };
+    document.addEventListener('keydown', escapeHandler);
 }
 
 // ============================================================================
@@ -1116,7 +1210,7 @@ function handleExportCSV() {
     // Trigger download
     const url = `/api/export/csv?${params.toString()}`;
     window.location.href = url;
-    console.log('📥 Exporting CSV...');
+    console.log('[LOG] Dashboard event');
 }
 
 function handleExportPDF() {
@@ -1130,5 +1224,5 @@ function handleExportPDF() {
     // Trigger download
     const url = `/api/export/pdf?${params.toString()}`;
     window.location.href = url;
-    console.log('📥 Exporting PDF...');
+    console.log('[LOG] Dashboard event');
 }

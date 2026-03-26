@@ -42,7 +42,7 @@ services:
       - "80:80"   # HTTP
     volumes:
       # Share logs with dashboard
-      - ./logs:/app/logs
+      - honeypot-logs:/app/logs
       # Mount Docker socket so honeypot can spawn attacker containers
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
@@ -63,10 +63,12 @@ services:
     ports:
       - "127.0.0.1:5000:5000"   # Dashboard web interface
     volumes:
-      # Share logs with honeypot (read-only)
-      - ./logs:/app/logs:ro
+      # Share logs with honeypot (read-write for clear data functionality)
+      - honeypot-logs:/app/logs
       # Share threat intelligence data
-      - ./data:/app/data
+      - honeypot-data:/app/data
+      # Mount source code for live development
+      - ./src:/app/src
       # Mount web assets for live development
       - ./web:/app/web
     networks:
@@ -74,6 +76,7 @@ services:
     restart: unless-stopped
     environment:
       - FLASK_ENV=development
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY}
 
   # ========================================
   # ML Enrichment Service
@@ -86,9 +89,9 @@ services:
     command: python src/enrichment_daemon.py
     volumes:
       # Read cleaned/raw logs
-      - ./logs:/app/logs:ro
+      - honeypot-logs:/app/logs:ro
       # Read/write enriched data
-      - ./data:/app/data
+      - honeypot-data:/app/data
       # ML models and data
       - ./ml:/app/ml
     networks:
@@ -99,9 +102,28 @@ services:
     depends_on:
       - dashboard
 
+  # ========================================
+  # Attack Simulator Service (Optional)
+  # ========================================
+  # Run from Docker to generate proper external IPs
+  simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.simulator
+    container_name: honeypot-simulator
+    networks:
+      - honeypot-net
+    environment:
+      - TARGET_HOST=honeypot-main
+    profiles:
+      - simulator
+    depends_on:
+      - honeypot
+
 networks:
   honeypot-net:
     driver: bridge
 
 volumes:
   honeypot-logs:
+  honeypot-data:

@@ -15,6 +15,33 @@ from xhtml2pdf import pisa
 from flask import render_template
 import threading
 import time
+import sys
+
+# Add multiple paths for threat intelligence import
+BASE_DIR = Path(__file__).parent.parent.resolve()
+ml_models_path = BASE_DIR / 'ml' / 'models'
+sys.path.insert(0, str(ml_models_path))
+sys.path.insert(0, str(BASE_DIR / 'ml'))
+
+from dotenv import load_dotenv
+load_dotenv()
+
+try:
+    from threat_intelligence import ThreatIntelligence  # type: ignore
+    TI_AVAILABLE = True
+    api_key = os.getenv('ABUSEIPDB_API_KEY')
+    TI_CLIENT = ThreatIntelligence(api_key) if api_key else None
+    if TI_CLIENT:
+        print(f"[INIT] Threat Intelligence initialized with {len(TI_CLIENT.cache)} cached entries")
+    else:
+        TI_AVAILABLE = False
+        print("[INIT] No ABUSEIPDB_API_KEY found, TI disabled")
+except Exception as e:
+    TI_AVAILABLE = False
+    TI_CLIENT = None
+    print(f"[INIT] WARNING: Threat Intelligence not available: {e}")
+    import traceback
+    traceback.print_exc()
 
 # Flask Configuration
 app = Flask(__name__, 
@@ -28,68 +55,114 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 # Paths - Use absolute paths to avoid issues
 SCRIPT_DIR = Path(__file__).parent.resolve()
 LOG_DIR = SCRIPT_DIR.parent / "logs"
+DATA_DIR = SCRIPT_DIR.parent / "data"
+
+# Track honeypot start time
+HONEYPOT_START_TIME = datetime.now()
 
 print(f"[INIT] Log directory: {LOG_DIR}")
 print(f"[INIT] Exists: {LOG_DIR.exists()}")
+print(f"[INIT] Honeypot started at: {HONEYPOT_START_TIME.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 def load_all_logs():
-    """Read all JSONL log files and return as list (prioritize enriched real data)"""
+    """Read all JSONL log files and merge with enriched threat intelligence"""
     all_logs = []
+    enriched_data = {}
     
-    # First priority: enriched REAL honeypot logs
-    enriched_real_file = SCRIPT_DIR.parent / "data" / "enriched_real_attacks.jsonl"
-    if enriched_real_file.exists():
-        print(f"[DEBUG] Loading enriched REAL attacks with threat intelligence...")
+    # Load enriched threat intelligence data first
+    enriched_file = DATA_DIR / "enriched_real_attacks.jsonl"
+    if enriched_file.exists():
         try:
-            with open(enriched_real_file, 'r', encoding='utf-8') as f:
+            with open(enriched_file, 'r', encoding='utf-8') as f:
                 for line in f:
                     try:
-                        log_entry = json.loads(line.strip())
-                        all_logs.append(log_entry)
+                        entry = json.loads(line.strip())
+                        ip = entry.get('source_ip')
+                        if ip:
+                            enriched_data[ip] = entry.get('threat_intelligence', {})
                     except json.JSONDecodeError:
                         continue
-            print(f"[DEBUG] Loaded {len(all_logs)} enriched real attacks")
         except FileNotFoundError:
             pass
     
-    # Second priority: enriched synthetic data (for training/testing)
-    if not all_logs:
-        enriched_synthetic_file = SCRIPT_DIR.parent / "ml" / "data" / "enriched_attacks.jsonl"
-        if enriched_synthetic_file.exists():
-            print(f"[DEBUG] Loading enriched SYNTHETIC attacks...")
-            try:
-                with open(enriched_synthetic_file, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        try:
-                            log_entry = json.loads(line.strip())
-                            all_logs.append(log_entry)
-                        except json.JSONDecodeError:
-                            continue
-                print(f"[DEBUG] Loaded {len(all_logs)} enriched synthetic attacks")
-            except FileNotFoundError:
-                pass
-    
-    # Fallback: raw logs without threat intelligence
-    if not all_logs:
-        log_files = glob.glob(str(LOG_DIR / "honeypot_*.jsonl"))
-        print(f"[DEBUG] Found {len(log_files)} raw log files")
+    # Load honeypot logs and merge with enriched data
+    log_files = glob.glob(str(LOG_DIR / "honeypot_*.jsonl"))
+    if log_files:
+        print(f"[DEBUG] Found {len(log_files)} fresh honeypot log files")
         for log_file in log_files:
             try:
                 with open(log_file, 'r', encoding='utf-8') as f:
                     for line in f:
                         try:
                             log_entry = json.loads(line.strip())
+                            ip = log_entry.get('source_ip')
+                            # Merge enriched threat intel if available
+                            if ip and ip in enriched_data:
+                                log_entry['threat_intelligence'] = enriched_data[ip]
                             all_logs.append(log_entry)
                         except json.JSONDecodeError:
                             continue
             except FileNotFoundError:
                 continue
-        print(f"[DEBUG] Loaded {len(all_logs)} raw attacks (no threat intel)")
+        print(f"[DEBUG] Loaded {len(all_logs)} attacks with enrichment merged")
     
     print(f"[DEBUG] Total entries loaded: {len(all_logs)}")
     return all_logs
 
+
+
+def get_uptime():
+    """Calculate honeypot uptime"""
+    uptime_delta = datetime.now() - HONEYPOT_START_TIME
+    days = uptime_delta.days
+    hours, remainder = divmod(uptime_delta.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    
+    if days > 0:
+        return f"{days}d {hours}h {minutes}m"
+    elif hours > 0:
+        return f"{hours}h {minutes}m {seconds}s"
+    else:
+        return f"{minutes}m {seconds}s"
+
+def enrich_with_threat_intelligence(logs):
+    """Enrich logs with threat intelligence data (on-the-fly)"""
+    if not TI_AVAILABLE or not logs:
+        return logs
+    
+    enriched = []
+    processed_ips = set()  # Cache lookups to avoid duplicate API calls
+    threat_cache = {}  # Store results
+    enriched_count = 0
+    
+    for entry in logs:
+        ip = entry.get('source_ip')
+        
+        # Only enrich if we have an IP and haven't already looked it up
+        if ip and ip not in processed_ips:
+            processed_ips.add(ip)
+            
+            # Skip private IPs
+            if not TI_CLIENT.is_private_ip(ip):
+                try:
+                    threat_data = TI_CLIENT.get_threat_data(ip)
+                    threat_cache[ip] = threat_data
+                    if threat_data.get('threat_data', {}).get('abuseConfidenceScore', 0) > 0:
+                        enriched_count += 1
+                except Exception as e:
+                    print(f"[ERROR] Threat enrichment failed for {ip}: {e}")
+        
+        # Add threat data to entry if we have it
+        if ip and ip in threat_cache:
+            entry['threat_intelligence'] = threat_cache[ip]
+        
+        enriched.append(entry)
+    
+    if enriched_count > 0:
+        print(f"[ENRICHMENT] Added threat data to {enriched_count} entries with scores > 0")
+    
+    return enriched
 
 def calculate_statistics(logs):
     """Calculate attack statistics from logs"""
@@ -101,6 +174,7 @@ def calculate_statistics(logs):
             "threat_ips": [],
             "credentials_captured": 0,
             "avg_threat_score": 0,
+            "active_ips_24h": 0,
             "recent_events": []
         }
     
@@ -109,6 +183,11 @@ def calculate_statistics(logs):
     ip_threat_map = {}
     credentials_count = 0
     threat_scores = []
+    unique_ips_24h = set()
+    
+    # Calculate 24h cutoff time
+    now = datetime.now()
+    cutoff_24h = now - timedelta(hours=24)
     
     for entry in logs:
         port = entry.get('port')
@@ -117,16 +196,43 @@ def calculate_statistics(logs):
         
         ip = entry.get('source_ip')
         if ip:
+            # Count all IPs including testing IPs
             ip_counter[ip] += 1
+            
+            # Count unique IPs in last 24h
+            timestamp_str = entry.get('timestamp', '')
+            try:
+                # Parse ISO format timestamp
+                entry_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                if entry_time >= cutoff_24h:
+                    unique_ips_24h.add(ip)
+            except:
+                # If timestamp parsing fails, assume it's recent
+                unique_ips_24h.add(ip)
         
-        if 'credentials' in entry:
+        # Count credentials more broadly
+        details = entry.get('details', '')
+        event_type = entry.get('event_type', '')
+        
+        # Check multiple ways credentials might be captured
+        if ('credentials' in entry or 
+            'password=' in details or 
+            'LOGIN' in event_type.upper() or
+            'FTP_LOGIN' in event_type):
             credentials_count += 1
         
-        # Extract threat score
+        # Extract threat score - handle multiple possible structures
         threat_intel = entry.get('threat_intelligence', {})
-        threat_data = threat_intel.get('threat_data', {})
+        threat_data = threat_intel
+        
+        # Support multiple structures:
+        # 1. threat_intel.threat_data.abuseConfidenceScore (from enrichment)
+        # 2. threat_intel.abuseConfidenceScore (flat structure)
+        if 'threat_data' in threat_intel:
+            threat_data = threat_intel['threat_data']
+        
         abuse_score = threat_data.get('abuseConfidenceScore')
-        if abuse_score is not None:
+        if abuse_score is not None and isinstance(abuse_score, (int, float)):
             threat_scores.append(abuse_score)
             
             # Store threat data for each IP (use highest score)
@@ -134,20 +240,34 @@ def calculate_statistics(logs):
                 ip_threat_map[ip] = {
                     'abuse_score': abuse_score,
                     'is_tor': threat_data.get('isTor', False),
-                    'total_reports': threat_data.get('totalReports', 0)
+                    'total_reports': threat_data.get('totalReports', 0),
+                    'country': threat_data.get('countryName', ''),
+                    'isp': threat_data.get('isp', ''),
+                    'usage_type': threat_data.get('usageType', ''),
+                    'num_distinct_users': threat_data.get('numDistinctUsers', 0),
+                    'last_reported': threat_data.get('lastReportedAt', '')
                 }
     
-    avg_threat = int(sum(threat_scores) / len(threat_scores)) if threat_scores else 0
+    # Calculate average threat score, handle edge cases
+    if threat_scores:
+        avg_threat = int(sum(threat_scores) / len(threat_scores))
+    else:
+        avg_threat = 0  # Default to 0 instead of NaN
+    
+    # Include all IPs (including private/Docker IPs) for demo visibility
     top_ips = [{"ip": ip, "count": count} for ip, count in ip_counter.most_common(10)]
     
-    # Sort IPs by threat score (highest first)
+    # Sort IPs by threat score (highest first) - include all IPs for demo
     threat_ips = sorted(
         [{"ip": ip, **data} for ip, data in ip_threat_map.items()],
         key=lambda x: x['abuse_score'],
         reverse=True
     )[:10]
     
-    recent_events = sorted(logs, key=lambda x: x.get('timestamp', ''), reverse=True)[:20]
+    # Show all recent events including simulated attacks from private IPs
+    recent_events = [
+        log for log in sorted(logs, key=lambda x: x.get('timestamp', ''), reverse=True)
+    ][:20]
     
     return {
         "total_attacks": len(logs),
@@ -156,9 +276,13 @@ def calculate_statistics(logs):
         "threat_ips": threat_ips,
         "credentials_captured": credentials_count,
         "avg_threat_score": avg_threat,
+        "active_ips_24h": len(unique_ips_24h),
+        "uptime": get_uptime(),
         "recent_events": recent_events
     }
+
 cache_file = SCRIPT_DIR.parent / "data" / "ip_cache.json"
+
 def load_cache_from_disk():
     """Load IP location cache from JSON file"""
     try:
@@ -223,6 +347,14 @@ def get_stats():
     
     # Load all logs
     logs = load_all_logs()
+    
+    # Enrich with threat intelligence (on-the-fly, but don't block if it fails)
+    try:
+        logs = enrich_with_threat_intelligence(logs)
+    except Exception as e:
+        print(f"[WARNING] Enrichment failed (API quota exhausted?): {e}")
+        # Continue without enrichment - show data anyway
+        pass
     
     # Apply time filter
     logs = filter_by_time(logs, time_range)
@@ -362,29 +494,74 @@ def filter_by_time(logs, time_range):
 
 @app.route('/api/map-data')
 def get_map_data():
-    """API endpoint - returns IP data for map (GeoIP to be added in Phase 3)"""
+    """API endpoint - returns IP data for map with country-level fallback"""
     logs = load_all_logs()
+    
+    # Country center coordinates fallback when ip-api.com unavailable
+    COUNTRY_COORDS = {
+        "CN": (35.0, 105.0), "US": (38.0, -97.0), "RU": (60.0, 100.0),
+        "IN": (20.0, 77.0), "BR": (-10.0, -55.0), "GB": (54.0, -2.0),
+        "FR": (46.0, 2.0), "DE": (51.0, 9.0), "JP": (36.0, 138.0),
+        "KR": (37.0, 127.5), "VN": (16.0, 108.0), "TH": (15.0, 100.0),
+        "TR": (39.0, 35.0), "CO": (4.0, -72.0), "PH": (13.0, 122.0),
+        "ID": (-5.0, 120.0), "MY": (2.5, 112.5), "SG": (1.35, 103.8),
+        "HK": (22.3, 114.2), "TW": (23.5, 121.0), "NL": (52.5, 5.75),
+        "PL": (52.0, 20.0), "UA": (49.0, 32.0), "IT": (42.8, 12.8),
+        "ES": (40.0, -4.0), "CA": (60.0, -95.0), "AU": (-25.0, 135.0),
+        "ZA": (-29.0, 24.0), "MX": (23.0, -102.0), "AR": (-34.0, -64.0),
+        "CL": (-30.0, -71.0), "SE": (62.0, 15.0), "NO": (60.5, 8.5),
+        "FI": (64.0, 26.0), "DK": (56.0, 10.0), "BE": (50.8, 4.0),
+        "CH": (47.0, 8.0), "AT": (47.5, 14.5), "CZ": (49.8, 15.5),
+        "RO": (46.0, 25.0), "HU": (47.0, 20.0), "GR": (39.0, 22.0),
+        "PT": (39.5, -8.0), "IE": (53.0, -8.0), "NZ": (-41.0, 174.0),
+        "IL": (31.5, 34.75), "AE": (24.0, 54.0), "SA": (24.0, 45.0),
+        "EG": (26.0, 30.0), "NG": (9.0, 8.0), "KE": (-1.0, 38.0)
+    }
     
     ip_counter = Counter()
     for entry in logs:
         ip = entry.get('source_ip')
-        if ip:
+        # Skip private IPs for map display
+        if ip and TI_CLIENT and not TI_CLIENT.is_private_ip(ip):
             ip_counter[ip] += 1
 
-     
     attacks = []
-    for ip, count in ip_counter.most_common(50):
-        location = lookup_ip_location(ip)
-        attack_data ={
-            "ip": ip,
-            "count": count,
-            }
+    for ip, count in ip_counter.most_common(30):  # Limit to 30 markers for performance
+        location = None
+        
+        # Try cache first (from previous successful lookups)
+        if ip in ip_cache:
+            location = ip_cache[ip]
+        
+        # Fallback to country-level coordinates from enrichment data
+        if not location:
+            # Check if IP has threat_intelligence with countryCode
+            matching_entries = [e for e in logs if e.get('source_ip') == ip]
+            if matching_entries:
+                threat_intel = matching_entries[0].get('threat_intelligence', {})
+                if isinstance(threat_intel, dict):
+                    # Extract threat_data from the enrichment structure
+                    threat_data = threat_intel.get('threat_data', threat_intel)
+                    if isinstance(threat_data, dict):
+                        country_code = threat_data.get('countryCode') or threat_data.get('country_code')
+                        if country_code and country_code in COUNTRY_COORDS:
+                            lat, lon = COUNTRY_COORDS[country_code]
+                            location = {
+                                "lat": lat,
+                                "lon": lon,
+                                "country": country_code,
+                                "city": threat_data.get('isp', 'Unknown')
+                            }
+        
         if location:
-           attack_data["lat"] = location["lat"]
-           attack_data["lon"] = location["lon"]
-           attack_data["country"] = location["country"]
-           attack_data["city"] = location["city"]
-        attacks.append(attack_data)
+            attacks.append({
+                "ip": ip,
+                "count": count,
+                "lat": location["lat"],
+                "lon": location["lon"],
+                "country": location["country"],
+                "city": location["city"]
+            })
     
     return jsonify({"attacks": attacks})
 
@@ -508,6 +685,43 @@ def export_pdf():
     )
 
 
+@app.route('/api/clear-data', methods=['POST'])
+def clear_data():
+    """Clear all attack data from logs directory"""
+    try:
+        log_files = glob.glob(str(LOG_DIR / "*.jsonl"))
+        deleted_count = 0
+        failed_count = 0
+        
+        for log_file in log_files:
+            try:
+                # Change permissions first if needed
+                os.chmod(log_file, 0o666)
+                os.remove(log_file)
+                print(f"[CLEAR] Deleted {log_file}")
+                deleted_count += 1
+            except Exception as e:
+                print(f"[CLEAR] Error deleting {log_file}: {e}")
+                failed_count += 1
+        
+        if deleted_count > 0:
+            print(f"[CLEAR] Successfully deleted {deleted_count} file(s)")
+        if failed_count > 0:
+            print(f"[CLEAR] Failed to delete {failed_count} file(s)")
+            
+        return jsonify({
+            'success': deleted_count > 0,
+            'message': f'Deleted {deleted_count} file(s)' if deleted_count > 0 else 'No files to delete',
+            'deleted': deleted_count,
+            'failed': failed_count
+        })
+    except Exception as e:
+        print(f"[CLEAR] Error: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
 
 # WebSocket Events
 @socketio.on('connect')
@@ -556,13 +770,31 @@ def monitor_logs_for_updates():
                         for line in new_lines:
                             try:
                                 attack = json.loads(line.strip())
+                                
+                                # Skip private IPs from live feed
+                                ip = attack.get('source_ip')
+                                if TI_CLIENT and TI_CLIENT.is_private_ip(ip):
+                                    continue
+                                
+                                # Enrich with threat intelligence
+                                if TI_AVAILABLE:
+                                    if ip:
+                                        try:
+                                            threat_data = TI_CLIENT.get_threat_data(ip)
+                                            attack['threat_intelligence'] = {
+                                                'status': 'success',
+                                                'threat_data': threat_data
+                                            }
+                                        except:
+                                            pass
+                                
                                 # Emit new attack to all connected clients
                                 socketio.emit('new_attack', attack)
                                 print(f"[MONITOR] Emitted new attack from {attack.get('source_ip')}")
                             except json.JSONDecodeError:
                                 pass
-                    
-                    last_log_size[log_file] = current_size
+                        
+                        last_log_size[log_file] = current_size
             
         except Exception as e:
             print(f"[MONITOR] Error: {e}")
@@ -583,3 +815,4 @@ if __name__ == '__main__':
     monitor_thread.start()
     
     socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)
+

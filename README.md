@@ -78,6 +78,10 @@ ssh -o StrictHostKeyChecking=no root@localhost -p 22
 | **Multi-Service Honeypot** | SSH, HTTP, FTP, Telnet with realistic responses |
 | **Threat Intelligence** | Real-time IP reputation via AbuseIPDB + Tor detection |
 | **Machine Learning** | 80% accuracy bot vs human classification |
+| **Interactive Dashboard** | Real-time filtering, exports (CSV/PDF), data management |
+| **Geographic Mapping** | Attack origin visualization with threat scores |
+| **Report Generation** | Professional PDF reports for compliance/documentation |
+| **Data Management** | One-click clear data with safety confirmations |
 | **Interactive Dashboard** | Live attacks, maps, filtering, statistics |
 | **Reporting** | Professional PDF reports + CSV export |
 | **Performance** | 485 attacks analyzed in <1 second |
@@ -103,6 +107,39 @@ ML Classification ─ Bot vs Human Detection
     ├── PDF Reports (Compliance)
     └── CSV Export (Analysis)
 ```
+
+## 🎬 Live Demo
+
+### 📊 Real-Time Dashboard
+<div align="center">
+<img src="demo/dashboard.png" alt="LE-Trap Dashboard" width="800"/>
+</div>
+
+*Live attack monitoring with geographic visualization, threat intelligence scoring, and ML-powered bot detection*
+
+### 🕸️ Interactive Honeypot Landing Page  
+<div align="center">
+<img src="demo/landing_page.png" alt="Honeypot Landing Page" width="800"/>
+</div>
+
+*Realistic fake website that lures attackers and captures their credentials and behavior*
+
+### 🎥 Full Video Demonstration
+
+<div align="center">
+
+https://github.com/user-attachments/assets/video_demo.mp4
+
+</div>
+
+**Video showcases:**
+- ✅ Multi-service attack capture (SSH, FTP, Telnet, HTTP)
+- ✅ Real-time threat intelligence enrichment from AbuseIPDB  
+- ✅ Machine learning classification (Bot vs Human)
+- ✅ Interactive dashboard filtering and data export
+- ✅ Professional PDF report generation
+
+*Click to play the full system walkthrough*
 
 ---
 
@@ -239,25 +276,29 @@ See [ml/README.md](ml/README.md) for detailed ML documentation.
 ```
 honeypot/
 ├── src/                         # Core application
-│   ├── honeypot.py             # Honeypot server
-│   ├── dashboard.py            # Flask dashboard
-│   ├── enrichment_worker.py    # Threat intelligence
-│   ├── clean_logs.py           # Log cleaning
-│   └── analyze_logs.py         # Log analysis
-├── ml/                         # Machine learning
-│   ├── models/                 # Trained models
-│   ├── train_classifier.py    # Model training
-│   ├── test_all_ml.py         # Test suite
-│   └── README.md              # ML documentation
-├── web/                        # Dashboard UI
+│   ├── honeypot.py             # Multi-service honeypot (SSH/FTP/Telnet/HTTP)
+│   ├── dashboard.py            # Real-time Flask dashboard
+│   ├── enrichment_daemon.py    # Threat intelligence enrichment
+│   └── analyze_logs.py         # Log analysis utilities
+├── tests/
+│   └── attack_simulator.py     # Generate realistic attack data
+├── demo/                       # Demo assets & screenshots
+│   ├── dashboard.png           # Dashboard screenshot
+│   ├── landing_page.png        # Honeypot landing page
+│   └── video_demo.mp4          # Full system demonstration
+├── ml/                         # Machine learning pipeline
+│   ├── models/                 # Trained ML models
+│   ├── train_classifier.py    # Bot vs Human classification
+│   └── test_all_ml.py         # ML test suite
+├── web/                        # Dashboard frontend
 │   ├── templates/             # HTML templates
-│   ├── static/                # CSS & JavaScript
-│   └── fake_website.html      # Honeypot landing page
-├── data/                       # Logs & cache
-│   └── enriched_real_attacks.jsonl
-├── docker-compose.yml         # Docker configuration
+│   ├── static/                # CSS, JavaScript, assets
+│   └── fake_website.html      # Interactive honeypot page
+├── data/                      # Enriched logs & cache (generated)
+├── logs/                      # Raw attack logs (generated)
+├── docker-compose.yml         # Docker orchestration
 ├── requirements.txt           # Python dependencies
-└── README.md                  # This file
+└── README.md                 # This documentation
 ```
 
 ---
@@ -281,7 +322,48 @@ Intentional filtering (192.168.x, 10.x, etc.) to save API quota.
 
 ---
 
-## Testing
+## Testing & Development
+
+### Generate Test Attacks
+
+Use the simplified attack simulator to generate realistic attack data:
+
+```bash
+# Simple usage (just specify number of attackers)
+python tests/attack_simulator.py 10
+python tests/attack_simulator.py 50
+python tests/attack_simulator.py 150
+
+# Results: Multi-port attacks (SSH, FTP, Telnet, HTTP)
+# - Bot attacks: Fast automated scanning
+# - Human attacks: Realistic timing patterns  
+# - All 4 services attacked equally for complete demo
+```
+
+**What gets generated:**
+- SSH brute force attempts (port 22)
+- FTP login attempts (port 21) 
+- Telnet reconnaissance (port 23)
+- HTTP attacks with credential capture (port 80)
+- Mix of automated bots (60%) and human-like patterns (40%)
+- Real threat intelligence from AbuseIPDB integration
+
+### Clear Test Data
+
+After testing, clear all attack logs via dashboard:
+
+1. Open `http://localhost:5000`
+2. Click **Clear Data** button (red button in Actions panel)
+3. Type `DELETE` to confirm (two-step safety)
+4. All `.jsonl` log files removed, dashboard resets
+
+Or use API directly:
+```bash
+curl -X POST http://localhost:5000/api/clear-data
+# Response: {"deleted": 1, "failed": 0, "success": true}
+```
+
+### ML Testing
 
 ```bash
 # Run all tests

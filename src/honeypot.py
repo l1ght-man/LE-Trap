@@ -9,6 +9,10 @@ import select
 import os
 import urllib.parse
 import paramiko
+import logging
+
+# Suppress paramiko SSH protocol errors (expected from attack simulator)
+logging.getLogger("paramiko").setLevel(logging.CRITICAL)
 
 # Configuration
 LOG_DIR = Path(__file__).parent.parent / "logs"
@@ -477,12 +481,16 @@ class Honeypot:
     def docker_output_reader(self, docker_sock, client_connection):
         """Thread: Reads from Docker, Sends to Hacker"""
         try:
+            docker_sock.settimeout(1)  # 1 second timeout to avoid hanging
             while True:
-                data = docker_sock.recv(4096)
-                if not data: 
-                    break
-                format_output = data.replace(b'\n', b'\r\n')
-                client_connection.send(format_output)
+                try:
+                    data = docker_sock.recv(4096)
+                    if not data: 
+                        break
+                    format_output = data.replace(b'\n', b'\r\n')
+                    client_connection.send(format_output)
+                except socket.timeout:
+                    continue  # Just retry on timeout
         except Exception as e:
             print(f"[*] Reader thread ended: {e}", flush=True)
     def start_docker_honeypot(self, client_sock, ip):
@@ -527,7 +535,17 @@ class Honeypot:
         
         print(f"\n[*] Container started for {ip}", flush=True)
         try:
-            docker_sock = container.attach_socket(params={'stdin': 1, 'stdout':1 , 'stream':1}) 
+            # Use exec_run instead of attach_socket for proper socket support
+            # This is the same pattern used successfully in start_docker_honeypot_ssh
+            exec_result = container.exec_run(
+                "/bin/bash -c 'stty -echo; exec bash --noediting'",
+                stdin=True,
+                stdout=True,
+                stderr=True,
+                tty=True,
+                socket=True
+            )
+            docker_sock = exec_result.output._sock  # Get the actual socket
             
             client_sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1) 
             client_sock.send(bytes([255,251,1]))
@@ -535,12 +553,9 @@ class Honeypot:
             client_sock.send(bytes([255,252,34]))
             client_sock.send(b"Connected to Ubuntu 22.04.4 LTS\r\n")
             
-            # Send initial prompt immediately
-            client_sock.send(b"root@prod-db-01:/# ")
-              
             t = threading.Thread(target=self.docker_output_reader, args=(docker_sock, client_sock))
             t.daemon = True
-            t.start() 
+            t.start()
             command_buffer = b""
             escape_mode = False
             escape_buff = b""
