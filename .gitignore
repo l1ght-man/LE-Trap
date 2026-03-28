@@ -48,9 +48,6 @@ honeypot_export_*.csv
 # ML Generated Files (except demo assets)
 ml/charts/
 ml/data/
-*.png
-*.jpg
-*.jpeg
 !demo/
 
 # Testing & Archives (Complete exclusion)
